@@ -1,0 +1,35 @@
+# IDE files
+.vscode/
+.settings/
+
+# Compiled files
+*.bin
+*.o
+*.s
+*.exe
+*.obj
+*.objdump
+
+# Assets
+assets/
+
+# Test output files
+*-test.txt
+
+# Media files
+*.3gp
+*.wav
+*.m4a
+*.mp3
+*.ogg
+*.avi
+*.mp4
+*.jiff
+*.tif
+*.ttf
+*.png
+*.bmp
+*.jpg
+*.jpeg
+*.gif
+

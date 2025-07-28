@@ -166,7 +166,7 @@ Image niveau_gris(Image origine)
   Image retour;
   int x = origine.getSize().x;
   int y = origine.getSize().y;
-  int c = 0;
+  Uint8 c = 0;
   retour.create(x, y);
   for (int i = 0 ; i < x ; i++)
   {
@@ -665,7 +665,7 @@ int main()
       false;
   bool _textEntered(false);
   Event _event;
-  srand(time(NULL));
+  srand(static_cast<unsigned int>(time(NULL)));
   bool _playerIsInLauncher(true);
   bool _playerIsInGame(false);
   bool _playerIsInMenu(false);
@@ -715,7 +715,7 @@ int main()
   Text _errorText("Impossible de jouer sans entrer de\npseudonyme !",
                   _basicFont, 18);
   _errorText.setStyle(Text::Bold);
-  _errorText.setColor(Color(255,255,100));
+  _errorText.setFillColor(Color(255,255,100));
   _errorText.setPosition(15.0f,
                          _error.getPosition().y + _error.getLocalBounds
                          ().height + 15.0f);
@@ -826,7 +826,7 @@ int main()
   /// Open Launcher
   Text _signGame("Narwhal", _narwhalFont, 144);
   _signGame.setStyle(Text::Bold);
-  _signGame.setColor(Color(199,199,255));
+  _signGame.setFillColor(Color(199,199,255));
   _signGame.setPosition((WIN_W - _signGame.getLocalBounds().width) /
                         2.00f, (WIN_H - _signGame.getLocalBounds().height)/
                         5.00f);
@@ -841,7 +841,7 @@ int main()
                           1.62f);
   Text _enterYourPseudo("Chargement du jeu en cours...", _basicFont, 32
                        );
-  _enterYourPseudo.setColor(Color(255,255,255));
+  _enterYourPseudo.setFillColor(Color(255,255,255));
   _enterYourPseudo.setPosition(_formulaire.getPosition().x + 7.0f,
                                _formulaire.getPosition().y -
                                _enterYourPseudo.getLocalBounds().height - 15.0f);
@@ -940,7 +940,7 @@ int main()
                          2151, 2390
                         }; // Limit pixels between each dragon
   int _dragonActualSect(1); // 1 -> 10 (different dragon sprite sections)
-  int _dragonSpeed(0);
+  float _dragonSpeed(0.0f);
   int _dragonAnimSpeed = NORMAL_SPEED_ANIM;
   int _dragonKill(0);
   if (!_dragonImg.loadFromFile("assets/images/narwhal.bmp"))
@@ -1408,7 +1408,7 @@ int main()
                          2358, 2620
                         }; // Limit pixels between each dragon
   int _epolarActualSect(1); // 1 -> 10 (different dragon sprite sections)
-  int _epolarSpeed(EPOLAR_INIT_SPEED);
+  float _epolarSpeed(EPOLAR_INIT_SPEED);
   // Décompte et temps
   int _epolarCount(0);
   int _epolarTotalCount(0);
@@ -1529,7 +1529,7 @@ int main()
   _credits.move(WIN_WIDTH - _credits.getLocalBounds().width,0);
   /// FPS (en dessous du score)
   bool _showFPS = false; // [U] --> Show/Hide FPS countdown
-  Int32 _fpscount = 0.0f; /// THIS IS ALSO THE LAST FPS REGISTERED
+  Int32 _fpscount = 0; /// THIS IS ALSO THE LAST FPS REGISTERED
   char _fpschr[20] = "";
   string _fpsstr = "FPS : 0";
   Text _fps;
@@ -1817,7 +1817,7 @@ int main()
   _listeImg.createMaskFromColor(Color(000,255,000));
   _listeText.loadFromImage(_listeImg);
   _listeText.setSmooth(true);
-  int _listeContenance = 3;
+  unsigned int _listeContenance = 3;
   unsigned int *_listeCurseur[NBR_LISTES] = {0};
   unsigned int *_listeSelected[NBR_LISTES] = {0};
   Text *_listeNomTxt[NBR_LISTES] = {0};
@@ -2033,7 +2033,7 @@ int main()
   vector<char> _formulaireVecchar(0);
   string _formulaireStr("");
   Text _formulaireText("", _basicFont, 64);
-  _formulaireText.setColor(Color::Black);
+  _formulaireText.setFillColor(Color::Black);
   _formulaireText.setPosition(_formulaire.getPosition().x + 10.0f,
                               _formulaire.getPosition().y - 2.0f);
   _enterYourPseudo.setString("Entrez votre pseudonyme :");
@@ -2497,13 +2497,13 @@ int main()
         if (_key[_keyid[KEYB_ACCELERATE]])
           /// Hold ACCELERATE -> Speed up
         {
-          _dragonSpeed = 20;
+          _dragonSpeed = 20.0f;
           _dragonAnimSpeed = HIGH_SPEED_ANIM;
         }
         if (!_key[_keyid[KEYB_ACCELERATE]])
           /// Release ACCELERATE -> Slow down
         {
-          _dragonSpeed = 7;
+          _dragonSpeed = 7.0f;
           _dragonAnimSpeed = NORMAL_SPEED_ANIM;
         }
         if (_key[_keyid[KEYB_FIREBALL]] && _dragonIsAlive)
@@ -2783,10 +2783,10 @@ int main()
               _epolarHealthBarDyn[i]->move(_epolarHealthBar[i]->getPosition().x + 49,
                                            _epolarHealthBar[i]->getPosition().y + 4);
               _epolarPhases[i][0] = _t_passedInGame;
-              for (unsigned int j = 1 ; j < EPOLAR_PHASES ;
-                   ++j) _epolarPhases[i][j] = 0;
-              for (unsigned int j = 1 ; j < EPOLAR_PHASES ;
-                   ++j) _epolarPhasesTime[j] *= EPOLAR_PHASETIME_ACC; // Accurate * 0.92
+              for (unsigned int j = 1 ; j < EPOLAR_PHASES ; ++j)
+                _epolarPhases[i][j] = 0;
+              for (unsigned int j = 1 ; j < EPOLAR_PHASES ; ++j)
+                _epolarPhasesTime[j] = static_cast<Int32>(_epolarPhasesTime[i] * EPOLAR_PHASETIME_ACC); // Accurate * 0.92
               _epolarStart[i] = false;
               _epolarFaceToEnd = false;
               break;
@@ -2801,8 +2801,7 @@ int main()
             if (!_epolarStart[i]) // Introduction of the Epolar
             {
               _epolar[i]->move((-_epolar[i]->getLocalBounds().width/_fpscount)*(1000/_epolarPhasesTime[0]), 0);  // 1 unit of epolar in 1 second
-              if (_t_passedInGame - _epolarPhases[i][0] >
-                  _epolarPhasesTime[0])
+              if (_t_passedInGame - _epolarPhases[i][0] > _epolarPhasesTime[0])
               {
                 _epolarStart[i] = true;
                 _epolarPhases[i][0] = 0;
@@ -2826,8 +2825,7 @@ int main()
                       WIN_HEIGHT - _epolar[i]->getLocalBounds().height)
                     _epolarGoesUp[i] = true;
                 }
-                if (_t_passedInGame - _epolarPhases[i][1]
-                    > _epolarPhasesTime[1])
+                if (_t_passedInGame - _epolarPhases[i][1] > _epolarPhasesTime[1])
                 {
                   _epolarYDiff =
                     objectif_y(_epolar[i]->getPosition(),_dragon.getPosition(),0) -
@@ -2840,8 +2838,7 @@ int main()
               {
                 _epolar[i]->move((-WIN_WIDTH/_fpscount)*(1000.0f/_epolarPhasesTime[2]),
                                  (_epolarYDiff/_fpscount)*(1000.0f/_epolarPhasesTime[2]));
-                if (_t_passedInGame - _epolarPhases[i][2]
-                    > _epolarPhasesTime[2])
+                if (_t_passedInGame - _epolarPhases[i][2] > _epolarPhasesTime[2])
                 {
                   _epolarFaceToEnd = true;
                   _epolarPhases[i][2] = 0;
@@ -2863,8 +2860,7 @@ int main()
                       WIN_HEIGHT - _epolar[i]->getLocalBounds().height)
                     _epolarGoesUp[i] = true;
                 }
-                if (_t_passedInGame - _epolarPhases[i][3]
-                    > _epolarPhasesTime[3])
+                if (_t_passedInGame - _epolarPhases[i][3] > _epolarPhasesTime[3])
                 {
                   _epolarYDiff =
                     objectif_y(_epolar[i]->getPosition(),_dragon.getPosition(),WIN_WIDTH -
@@ -2875,10 +2871,8 @@ int main()
               }
               if (_epolarPhases[i][4] != 0)
               {
-                _epolar[i]->move((WIN_WIDTH/_fpscount)*(1000.0f/_epolarPhasesTime[4]),
-                                 (_epolarYDiff/_fpscount)*(1000.0f/_epolarPhasesTime[4]));
-                if (_t_passedInGame - _epolarPhases[i][4]
-                    > _epolarPhasesTime[4])
+                _epolar[i]->move((WIN_WIDTH/_fpscount)*(1000.0f/_epolarPhasesTime[4]), (_epolarYDiff/_fpscount)*(1000.0f/_epolarPhasesTime[4]));
+                if (_t_passedInGame - _epolarPhases[i][4] > _epolarPhasesTime[4])
                 {
                   _epolarFaceToEnd = false;
                   _epolarPhases[i][4] = 0;
@@ -3231,7 +3225,7 @@ int main()
           _dragon.move(0,1);
         }
         /// ATH
-        sprintf(_texte, "Score : %d", _dragonKill);
+        sprintf_s(_texte, "Score : %d", _dragonKill);
         _texteS = _texte;
         _score.setString(_texteS);
         /// Background Advancing
@@ -3371,7 +3365,7 @@ int main()
         /// FPS F3
         _lasttime = _chrono.getElapsedTime().asMilliseconds();
         _fpscount = 1000 / _lasttime;
-        sprintf(_fpschr, "FPS : %d", _fpscount);
+        sprintf_s(_fpschr, "FPS : %d", _fpscount);
         _fpsstr = _fpschr;
         _fps.setString(_fpsstr);
         if (_showFPS)
@@ -3664,7 +3658,7 @@ int main()
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
-                *_listeCurseur[LISTE_MUSIQUES] = min(max((unsigned int)0, _listeChoixStr[LISTE_MUSIQUES].size() - _listeContenance), *_listeCurseur[LISTE_MUSIQUES] + 1);
+                *_listeCurseur[LISTE_MUSIQUES] = min(max((unsigned int)0, static_cast<unsigned int>(_listeChoixStr[LISTE_MUSIQUES].size()) - _listeContenance), *_listeCurseur[LISTE_MUSIQUES] + 1);
                 _buttonpressed[Mouse::Left] = true;
               }
             }
@@ -3680,9 +3674,9 @@ int main()
             {
               if (*_listeSelected[LISTE_MUSIQUES] ==
                   *_listeCurseur[LISTE_MUSIQUES] + 0)
-                _listeChoixTxt0[LISTE_MUSIQUES]->setColor(Color(127,255,127));
+                _listeChoixTxt0[LISTE_MUSIQUES]->setFillColor(Color(127,255,127));
               else
-                _listeChoixTxt0[LISTE_MUSIQUES]->setColor(Color(000,255,255));
+                _listeChoixTxt0[LISTE_MUSIQUES]->setFillColor(Color(000,255,255));
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
@@ -3698,9 +3692,9 @@ int main()
             {
               if (*_listeSelected[LISTE_MUSIQUES] ==
                   *_listeCurseur[LISTE_MUSIQUES] + 0)
-                _listeChoixTxt0[LISTE_MUSIQUES]->setColor(Color(255,255,000));
+                _listeChoixTxt0[LISTE_MUSIQUES]->setFillColor(Color(255,255,000));
               else
-                _listeChoixTxt0[LISTE_MUSIQUES]->setColor(Color(255,255,255));
+                _listeChoixTxt0[LISTE_MUSIQUES]->setFillColor(Color(255,255,255));
             }
             // Deuxième slot de la liste de la musique
             if (contact((Vector2f)Mouse::getPosition(_window)
@@ -3710,9 +3704,9 @@ int main()
             {
               if (*_listeSelected[LISTE_MUSIQUES] ==
                   *_listeCurseur[LISTE_MUSIQUES] + 1)
-                _listeChoixTxt1[LISTE_MUSIQUES]->setColor(Color(127,255,127));
+                _listeChoixTxt1[LISTE_MUSIQUES]->setFillColor(Color(127,255,127));
               else
-                _listeChoixTxt1[LISTE_MUSIQUES]->setColor(Color(000,255,255));
+                _listeChoixTxt1[LISTE_MUSIQUES]->setFillColor(Color(000,255,255));
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
@@ -3728,9 +3722,9 @@ int main()
             {
               if (*_listeSelected[LISTE_MUSIQUES] ==
                   *_listeCurseur[LISTE_MUSIQUES] + 1)
-                _listeChoixTxt1[LISTE_MUSIQUES]->setColor(Color(255,255,000));
+                _listeChoixTxt1[LISTE_MUSIQUES]->setFillColor(Color(255,255,000));
               else
-                _listeChoixTxt1[LISTE_MUSIQUES]->setColor(Color(255,255,255));
+                _listeChoixTxt1[LISTE_MUSIQUES]->setFillColor(Color(255,255,255));
             }
             // Troisième slot de la liste de la musique
             if (contact((Vector2f)Mouse::getPosition(_window)
@@ -3740,9 +3734,9 @@ int main()
             {
               if (*_listeSelected[LISTE_MUSIQUES] ==
                   *_listeCurseur[LISTE_MUSIQUES] + 2)
-                _listeChoixTxt2[LISTE_MUSIQUES]->setColor(Color(127,255,127));
+                _listeChoixTxt2[LISTE_MUSIQUES]->setFillColor(Color(127,255,127));
               else
-                _listeChoixTxt2[LISTE_MUSIQUES]->setColor(Color(000,255,255));
+                _listeChoixTxt2[LISTE_MUSIQUES]->setFillColor(Color(000,255,255));
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
@@ -3758,9 +3752,9 @@ int main()
             {
               if (*_listeSelected[LISTE_MUSIQUES] ==
                   *_listeCurseur[LISTE_MUSIQUES] + 2)
-                _listeChoixTxt2[LISTE_MUSIQUES]->setColor(Color(255,255,000));
+                _listeChoixTxt2[LISTE_MUSIQUES]->setFillColor(Color(255,255,000));
               else
-                _listeChoixTxt2[LISTE_MUSIQUES]->setColor(Color(255,255,255));
+                _listeChoixTxt2[LISTE_MUSIQUES]->setFillColor(Color(255,255,255));
             }
             break;
           case MENU_TOUCHES:
@@ -3803,7 +3797,7 @@ int main()
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
-                _menuTxtBarre[BUT_KEY_ACCERELATE]->setColor(Color(255,255,0));
+                _menuTxtBarre[BUT_KEY_ACCERELATE]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_ACCERELATE]);
                 _window.display();
                 _menu_prochain = MENU_TOUCHES_ACCELERATE;
@@ -3825,7 +3819,7 @@ int main()
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
-                _menuTxtBarre[BUT_KEY_FORWARD]->setColor(Color(255,255,0));
+                _menuTxtBarre[BUT_KEY_FORWARD]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_FORWARD]);
                 _window.display();
                 _menu_prochain = MENU_TOUCHES_FORWARD;
@@ -3847,7 +3841,7 @@ int main()
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
-                _menuTxtBarre[BUT_KEY_BACKWARD]->setColor(Color(255,255,0));
+                _menuTxtBarre[BUT_KEY_BACKWARD]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_BACKWARD]);
                 _window.display();
                 _menu_prochain = MENU_TOUCHES_BACKWARD;
@@ -3868,7 +3862,7 @@ int main()
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
-                _menuTxtBarre[BUT_KEY_GOUP]->setColor(Color(255,255,0));
+                _menuTxtBarre[BUT_KEY_GOUP]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_GOUP]);
                 _window.display();
                 _menu_prochain = MENU_TOUCHES_GOUP;
@@ -3890,7 +3884,7 @@ int main()
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
-                _menuTxtBarre[BUT_KEY_GODOWN]->setColor(Color(255,255,0));
+                _menuTxtBarre[BUT_KEY_GODOWN]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_GODOWN]);
                 _window.display();
                 _menu_prochain = MENU_TOUCHES_GODOWN;
@@ -3912,7 +3906,7 @@ int main()
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
-                _menuTxtBarre[BUT_KEY_FPSDISP]->setColor(Color(255,255,0));
+                _menuTxtBarre[BUT_KEY_FPSDISP]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_FPSDISP]);
                 _window.display();
                 _menu_prochain = MENU_TOUCHES_FPSDISP;
@@ -3934,7 +3928,7 @@ int main()
               if (_button[Mouse::Left] &&
                   !_buttonpressed[Mouse::Left])
               {
-                _menuTxtBarre[BUT_KEY_FIREBALL]->setColor(Color(255,255,0));
+                _menuTxtBarre[BUT_KEY_FIREBALL]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_FIREBALL]);
                 _window.display();
                 _menu_prochain = MENU_TOUCHES_FIREBALL;
@@ -3951,7 +3945,7 @@ int main()
                 _event.key.code != Keyboard::Escape)
             {
               _keyid[KEYB_ACCELERATE] = _event.key.code;
-              _menuTxtBarre[BUT_KEY_ACCERELATE]->setColor(Color(255,255,255));
+              _menuTxtBarre[BUT_KEY_ACCERELATE]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_ACCERELATE]);
               _window.display();
               _menu_prochain = MENU_TOUCHES;
@@ -3962,7 +3956,7 @@ int main()
                 _event.key.code != Keyboard::Escape)
             {
               _keyid[KEYB_FORWARD] = _event.key.code;
-              _menuTxtBarre[BUT_KEY_FORWARD]->setColor(Color(255,255,255));
+              _menuTxtBarre[BUT_KEY_FORWARD]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_FORWARD]);
               _window.display();
               _menu_prochain = MENU_TOUCHES;
@@ -3973,7 +3967,7 @@ int main()
                 _event.key.code != Keyboard::Escape)
             {
               _keyid[KEYB_BACKWARD] = _event.key.code;
-              _menuTxtBarre[BUT_KEY_BACKWARD]->setColor(Color(255,255,255));
+              _menuTxtBarre[BUT_KEY_BACKWARD]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_BACKWARD]);
               _window.display();
               _menu_prochain = MENU_TOUCHES;
@@ -3984,7 +3978,7 @@ int main()
                 _event.key.code != Keyboard::Escape)
             {
               _keyid[KEYB_GOUP] = _event.key.code;
-              _menuTxtBarre[BUT_KEY_GOUP]->setColor(Color(255,255,255));
+              _menuTxtBarre[BUT_KEY_GOUP]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_GOUP]);
               _window.display();
               _menu_prochain = MENU_TOUCHES;
@@ -3995,7 +3989,7 @@ int main()
                 _event.key.code != Keyboard::Escape)
             {
               _keyid[KEYB_GODOWN] = _event.key.code;
-              _menuTxtBarre[BUT_KEY_GODOWN]->setColor(Color(255,255,255));
+              _menuTxtBarre[BUT_KEY_GODOWN]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_GODOWN]);
               _window.display();
               _menu_prochain = MENU_TOUCHES;
@@ -4006,7 +4000,7 @@ int main()
                 _event.key.code != Keyboard::Escape)
             {
               _keyid[KEYB_FPSDISP] = _event.key.code;
-              _menuTxtBarre[BUT_KEY_FPSDISP]->setColor(Color(255,255,255));
+              _menuTxtBarre[BUT_KEY_FPSDISP]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_FPSDISP]);
               _window.display();
               _menu_prochain = MENU_TOUCHES;
@@ -4017,7 +4011,7 @@ int main()
                 _event.key.code != Keyboard::Escape)
             {
               _keyid[KEYB_FIREBALL] = _event.key.code;
-              _menuTxtBarre[BUT_KEY_FIREBALL]->setColor(Color(255,255,255));
+              _menuTxtBarre[BUT_KEY_FIREBALL]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_FIREBALL]);
               _window.display();
               _menu_prochain = MENU_TOUCHES;
@@ -4266,7 +4260,7 @@ int main()
         // Afficher le scoreboard
         for (unsigned int i = 0 ; i < 5 ; i++)
         {
-          sprintf(_sb_scores_chr[i], " : %d\n", _sb_scores[i]);
+          sprintf_s(_sb_scores_chr[i], " : %d\n", _sb_scores[i]);
           _sb_scores_str[i] = _sb_scores_chr[i];
         }
         _sb.setString(string("------------------- SCOREBOARD--------------------\n")+ string("*")+_sb_players[0]+_sb_scores_str[0]+

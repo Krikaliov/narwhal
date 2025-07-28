@@ -4,6 +4,7 @@
 
 # Compiled files
 build/
+bin/
 *.bin
 *.o
 *.s

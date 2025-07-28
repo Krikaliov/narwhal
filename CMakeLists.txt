@@ -1,14 +1,21 @@
-cmake_minimum_required(VERSION 3.14)
-set(VERSION 1.0)
-project(narwhal VERSION ${VERSION})
+cmake_minimum_required(VERSION 3.15)
+project(narwhal LANGUAGES CXX)
 
-list(APPEND CMAKE_PREFIX_PATH "C:/SFML-2.4.2/cmake")
-find_package(SFML 2 COMPONENTS window graphics audio network REQUIRED)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+
+include(FetchContent)
+FetchContent_Declare(SFML
+  GIT_REPOSITORY https://github.com/SFML/SFML.git
+  GIT_TAG 2.6.2
+  GIT_SHALLOW ON)
+FetchContent_MakeAvailable(SFML)
+
 include_directories(${SFML_INCLUDE_DIR})
 
-file(GLOB_RECURSE SOURCES "src/*.cpp")
+file(GLOB_RECURSE SOURCE_DIRECTORY "src/*.cpp")
 
-add_executable(${PROJECT_NAME}-v${VERSION} ${SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCE_DIRECTORY})
 
-target_include_directories(${PROJECT_NAME}-v${VERSION} ${SOURCES})
-target_link_libraries(${PROJECT_NAME}-v${VERSION} ${SFML_LIBRAIRIES})
+target_include_directories(${PROJECT_NAME} PRIVATE src)
+target_link_libraries(${PROJECT_NAME} PRIVATE sfml-network sfml-graphics sfml-audio sfml-window sfml-system)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)

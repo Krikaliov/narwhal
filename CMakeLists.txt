@@ -10,5 +10,5 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 add_executable(${PROJECT_NAME}-v${VERSION} ${SOURCES})
 
-target_include_directories(${PROJECT_NAME}-v${VERSION} ${SOURCES})*
+target_include_directories(${PROJECT_NAME}-v${VERSION} ${SOURCES})
 target_link_libraries(${PROJECT_NAME}-v${VERSION} ${SFML_LIBRAIRIES})

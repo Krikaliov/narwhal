@@ -3,6 +3,7 @@
 .settings/
 
 # Compiled files
+build/
 *.bin
 *.o
 *.s

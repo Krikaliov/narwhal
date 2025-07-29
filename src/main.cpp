@@ -128,8 +128,8 @@ la position actuelle :ios::cur.
 #define BUT_MUSIC_REPEAT 16
 #define NBR_BUTTONS 17
 
-#define JAUGE_MUSIQUE 0
-#define JAUGE_SON 1
+#define JAUGE_SON 0
+#define JAUGE_MUSIQUE 1
 #define NBR_JAUGES 2
 
 #define BUT_MOUSEON 76
@@ -839,8 +839,7 @@ int main()
   _formulaire.setPosition((WIN_W - _formulaire.getLocalBounds().width) /
                           2.00f, (WIN_H - _formulaire.getLocalBounds().height)/
                           1.62f);
-  Text _enterYourPseudo("Chargement du jeu en cours...", _basicFont, 32
-                       );
+  Text _enterYourPseudo("Chargement du jeu en cours...", _basicFont, 32);
   _enterYourPseudo.setFillColor(Color(255,255,255));
   _enterYourPseudo.setPosition(_formulaire.getPosition().x + 7.0f,
                                _formulaire.getPosition().y -
@@ -1432,8 +1431,7 @@ int main()
   Sprite *_epolarHealthBar[MAX_EPOLAR] = {0};
   Image _epolarHealthBarImg;
   Texture _epolarHealthBarText;
-  if
-  (!_epolarHealthBarImg.loadFromFile("assets/images/epolar_health_bar.png"))
+  if (!_epolarHealthBarImg.loadFromFile("assets/images/epolar_health_bar.png"))
   {
     _windowError.create(VideoMode(858,570), "Narwhal Bug");
     _errorText.setString("Impossible de charger la jauge de vie d'Epolar");
@@ -1852,18 +1850,20 @@ int main()
     _listeSelected[i] = new unsigned int(0);
   }
   // Jauges
-  _menuJaugeFond[JAUGE_SON]->setPosition((WIN_WIDTH -_menuJaugeFond[JAUGE_SON]->getLocalBounds().width) /2, (WIN_HEIGHT-_menuJaugeFond[JAUGE_SON]->getLocalBounds().height)/4);
+  _menuJaugeFond[JAUGE_SON]->setPosition(
+    (WIN_WIDTH-_menuJaugeFond[JAUGE_SON]->getLocalBounds().width)/2,
+    (WIN_HEIGHT-_menuJaugeFond[JAUGE_SON]->getLocalBounds().height)/4);
   _menuJaugeCursor[JAUGE_SON]->setPosition(_menuJaugeFond[JAUGE_SON]->getPosition().x + _firehorn_volume*(729.0f - _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width)/100.0f, _menuJaugeFond[JAUGE_SON]->getPosition().y);
   _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+int_to_string(static_cast<int>(_firehorn_volume))+" %");
   _menuTxtJauge[JAUGE_SON]->setPosition(_menuJaugeFond[JAUGE_SON]->getPosition().x + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().width - _menuTxtJauge[JAUGE_SON]->getLocalBounds().width )/2, _menuJaugeFond[JAUGE_SON]->getPosition().y + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().height-_menuTxtJauge[JAUGE_SON]->getLocalBounds().height)/4);
-  _menuJaugeFond[JAUGE_MUSIQUE]->setPosition((WIN_WIDTH-_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width)/2,_menuJaugeFond[JAUGE_SON]->getPosition().y -_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height - 15);
-  _menuJaugeCursor[JAUGE_MUSIQUE]->setPosition(_menuJaugeFond[JAUGE_MUSIQUE]
-      ->getPosition().x + _music_volume*(729.0f -
-                                         _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width)/100.0f,
-      _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y);
+  _menuJaugeFond[JAUGE_MUSIQUE]->setPosition(
+    (WIN_WIDTH-_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width)/2,
+    _menuJaugeFond[JAUGE_SON]->getPosition().y -_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height - 15);
+  _menuJaugeCursor[JAUGE_MUSIQUE]->setPosition(
+    _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + _music_volume*(729.0f - _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width)/100.0f,
+    _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y);
   _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique :"+int_to_string(static_cast<int>(_music_volume))+" %");
-  _menuTxtJauge[JAUGE_MUSIQUE]->setPosition(_menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width -
-      _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().width )/2,
+  _menuTxtJauge[JAUGE_MUSIQUE]->setPosition(_menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width - _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().width )/2,
       _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y +
       (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height-
        _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().height)/4);
@@ -3608,10 +3608,8 @@ int main()
                         _menuJaugeFond[JAUGE_MUSIQUE]->getPosition(),
                         _menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds()))
             {
-              _menuJaugeRect[JAUGE_MUSIQUE]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuJaugeRect[JAUGE_MUSIQUE]->top = BUT_MOUSEON;
+              if (_button[Mouse::Left] && !_buttonpressed[Mouse::Left])
               {
                 _menuJaugeCursor[JAUGE_MUSIQUE]->setPosition(max(_menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x,
                     min((float)Mouse::getPosition(_window).x -
@@ -3627,8 +3625,7 @@ int main()
             }
             else
             {
-              _menuJaugeRect[JAUGE_MUSIQUE]->top =
-                BUT_MOUSEOUT;
+              _menuJaugeRect[JAUGE_MUSIQUE]->top = BUT_MOUSEOUT;
             }
             // Liste des musiques : flèche du haut
             if (contact((Vector2f)Mouse::getPosition(_window)
@@ -3637,8 +3634,7 @@ int main()
                         _listeFlecheHaut[LISTE_MUSIQUES]->getLocalBounds()))
             {
               _listeFlecheHaut[LISTE_MUSIQUES]->setColor(Color(191,191,191));
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              if (_button[Mouse::Left] && !_buttonpressed[Mouse::Left])
               {
                 *_listeCurseur[LISTE_MUSIQUES] = max((unsigned int)0, *_listeCurseur[LISTE_MUSIQUES] - 1);
                 _buttonpressed[Mouse::Left] = true;

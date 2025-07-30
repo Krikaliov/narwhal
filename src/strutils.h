@@ -4,9 +4,19 @@
 #include <vector>
 #include <string>
 
-std::vector<char> str_to_vecchar(std::string s);
-std::string vecchar_to_str(std::vector<char> v);
-std::string float_to_string(float f);
-std::string int_to_string(int i);
+/// @brief Convert a string to a char list (vector)
+/// @param s original string
+/// @return a char list (vector).
+std::vector<char> stringToCharList(std::string s);
+
+/// @brief Convert a char list (vector) to a string
+/// @param v original char list (vector)
+/// @return a string.
+std::string charListToString(std::vector<char> v);
+
+/// @brief Print an integer into a string
+/// @param i integer to print
+/// @return string with the printed integer.
+std::string intToString(int i);
 
 #endif // STRUTILS_H

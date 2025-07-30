@@ -1,644 +1,11 @@
-/***************
- * @name NARVWHAL
- * @author Krikal
- ***************/
-
-#define TXT_NOIR 0x0
-#define TXT_BLEU_3 0x1
-#define TXT_VERT_3 0x2
-#define TXT_BLEU_GRIS 0x3.
-#define TXT_MARRON 0x4
-#define TXT_VIOLET 0x5
-#define TXT_KAKI 0x6
-#define TXT_GRIS_1 0x7
-#define TXT_GRIS_2 0x8
-#define TXT_BLEU_1 0x9
-#define TXT_VERT_1 0xA
-#define TXT_CYAN 0xB
-#define TXT_ROUGE 0xC
-#define TXT_ROSE 0xD
-#define TXT_JAUNE 0xE
-#define TXT_BLANC 0xF
-
-/*Ç --> 128
-é --> 130
-â --> 131
-à --> 133
-å --> 134
-ç --> 135
-ê --> 136
-è --> 138
-É --> 144
-æ --> 145
-ô --> 147
-ö --> 148
-û --> 150
-ù --> 151
-*/
-
-/* Traîtement de fichiers :
-le début du fichier :ios::beg;
-la fin du fichier :ios::end;
-la position actuelle :ios::cur.
-*/
-
-#include <fstream>
-#include <cmath>
-#include <ctime>
-
-#include <windows.h>
-#include <conio.h>
-#include <process.h>
-
-#include <SFML/Network.hpp>
-#include <SFML/Audio.hpp>
-#include <SFML/Graphics.hpp>
-
+#include "utils.h"
 #include "strutils.h"
-
-#define WIN_WIDTH 1366 //(px)
-#define WIN_HEIGHT 768 //(px)
-#define WIN_TICK 0.016667f //(s)
-
-#define WIN_H 672 //(px)
-#define WIN_W 1008 //(px)
-
-#define CURSOR_NORMAL {0, 0, 25, 26} //(px^4)
-#define CURSOR_ONTEXT {25, 0, 10, 26} //(px^4)
-
-#define LAUNCHER_NORMAL 0 //(qtt)
-#define LAUNCHER_TYPING 1 //(qtt)
-
-#define PSEUDO_MAXSIZE 25 //(qtt)
-
-#define MAX_FIREBALL 64
-#define MAX_MONSTER 32
-#define MAX_BONUS 8
-
-#define MONSTER_INIT_SPEED 0.01f //(rad/fps)
-#define MONSTER_ACCELERATION 0.0002f //(rad/fps^2)
-
-#define FIREBALL_SPEED 25 //(px/fps)
-
-#define MAX_EPOLAR 4
-#define EPOLAR_ACCELERATION 0.48f //(px/fps^2)
-#define EPOLAR_SPEED_ANIM 100 //(Hz.10^3)
-#define EPOLAR_INIT_SPEED 3.0f //(px/fps)
-#define EPOLAR_INIT_HEALTH 25
-#define EPOLAR_GAIN_HEALTH 10
-#define EPOLAR_PHASES 5
-#define EPOLAR_PHASETIME_0 1000 //(ms)
-#define EPOLAR_PHASETIME_1 3000 //(ms)
-#define EPOLAR_PHASETIME_2 2000 //(ms)
-#define EPOLAR_PHASETIME_3 3000 //(ms)
-#define EPOLAR_PHASETIME_4 2000 //(ms)
-#define EPOLAR_PHASETIME_ACC 0.92 //(%)
-
-#define NORMAL_SPEED_ANIM 100 //(Hz.10^3)
-#define HIGH_SPEED_ANIM 30 //(Hz.10^3)
-#define FBEFFECT_DURATION 5000 //(ms)
-
-#define MAX_BACKGROUND_ADVANCEMENT 1300-768 //(px)
-// Background rocks : 0, 70, 146, 223, 300, 380, 458
-#define MAX_ROCKS 64
-
-#define MONSTER_SPAWN_NBR 8
-
-#define MAX_SOUNDS 64
-
-#define HEALTHBAR_SIZE 179 //(px)
-#define HEALTHBAR_HEIGHT 6 //(px)
-
-#define BUT_RETOUR_JEU 0
-#define BUT_TOUCHES 1
-#define BUT_MUSIQUE 2
-#define BUT_RETOUR_MAIN 3
-#define BUT_KEY_FORWARD 4
-#define BUT_KEY_BACKWARD 5
-#define BUT_KEY_GODOWN 6
-#define BUT_KEY_GOUP 7
-#define BUT_KEY_FIREBALL 8
-#define BUT_KEY_ACCERELATE 9
-#define BUT_KEY_FPSDISP 10
-#define BUT_MUSIC_UP 11
-#define BUT_MUSIC_DOWN 12
-#define BUT_SOUND_UP 13
-#define BUT_SOUND_DOWN 14
-#define BUT_MUSIC_CHOICE 15
-#define BUT_MUSIC_REPEAT 16
-#define NBR_BUTTONS 17
-
-#define JAUGE_SON 0
-#define JAUGE_MUSIQUE 1
-#define NBR_JAUGES 2
-
-#define BUT_MOUSEON 76
-#define BUT_MOUSEOUT 0
-
-#define MENU_MAIN 0
-#define MENU_MUSIQUE 1
-#define MENU_TOUCHES 2
-#define MENU_TOUCHES_FORWARD 3
-#define MENU_TOUCHES_BACKWARD 4
-#define MENU_TOUCHES_FIREBALL 5
-#define MENU_TOUCHES_FPSDISP 6
-#define MENU_TOUCHES_ACCELERATE 7
-#define MENU_TOUCHES_GOUP 8
-#define MENU_TOUCHES_GODOWN 9
-
-#define KEYB_FORWARD 0
-#define KEYB_BACKWARD 1
-#define KEYB_GODOWN 2
-#define KEYB_GOUP 3
-#define KEYB_FIREBALL 4
-#define KEYB_ACCELERATE 5
-#define KEYB_FPSDISP 6
-#define NBR_KEYS 7
-
-#define LISTE_MUSIQUES 0
-#define NBR_LISTES 1
 
 using namespace sf;
 using namespace std;
 
-Image niveau_gris(Image origine)
-{
-  Image retour;
-  int x = origine.getSize().x;
-  int y = origine.getSize().y;
-  Uint8 c = 0;
-  retour.create(x, y);
-  for (int i = 0 ; i < x ; i++)
-  {
-    for (int j = 0 ; j < y ; j++)
-    {
-      c = (origine.getPixel(i, j).b + origine.getPixel(i, j).g + origine.getPixel(i, j).r)/3;
-      retour.setPixel(i, j, Color(c, c, c, origine.getPixel(i, j).a));
-    }
-  }
-  return retour;
-}
-
-vector<string> rechercher_musiques()
-{
-  vector<string> retour;
-
-  _wsystem(L"(tree assets\\audio\\musiques /f)>musiques.txt");
-
-  ifstream fichier("musiques.txt");
-  string contenu;
-
-  // Sets position to the end of the file.
-  fichier.seekg(0, ios::end);
-
-  // Reserves memory for the file.
-  contenu.reserve(fichier.tellg());
-
-  // Sets position to the start of the file.
-  fichier.seekg(0, ios::beg);
-
-  // Sets contents of 'contenu' to all characters in the file.
-  contenu.assign(istreambuf_iterator<char>(fichier), istreambuf_iterator<char>());
-  vector<char> contenu_disass = str_to_vecchar(contenu);
-
-  /// BROWSE MUSIC
-  unsigned int cursor = 0;
-  unsigned int cursor_old = 0;
-  unsigned int nombre_musiques = 0;
-  unsigned int espaces_consecutifs = 0;
-  char format[3] = {'m','p','3'};
-  char bloc_chr = 0;
-  vector<vector<char> > musiques;
-  bool insearch = true;
-  bool music_found = false;
-
-  while (cursor < contenu_disass.size() && insearch)
-  {
-    // Search music formats ...
-    switch (contenu_disass[cursor])
-    {
-      case '.':
-        if (contenu_disass[cursor+1] == 'o' &&
-            contenu_disass[cursor+2] == 'g' &&
-            contenu_disass[cursor+3] == 'g')
-        {
-          format[0] = 'o';
-          format[1] = 'g';
-          format[2] = 'g';
-          music_found = true;
-        }
-        else if (contenu_disass[cursor+1] == 'w' &&
-                 contenu_disass[cursor+2] == 'a' &&
-                 contenu_disass[cursor+3] == 'v')
-        {
-          format[0] = 'w';
-          format[1] = 'a';
-          format[2] = 'v';
-          music_found = true;
-        }
-        else if (contenu_disass[cursor+1] == '3' &&
-                 contenu_disass[cursor+2] == 'g' &&
-                 contenu_disass[cursor+3] == 'p')
-        {
-          format[0] = '3';
-          format[1] = 'g';
-          format[2] = 'p';
-          music_found = true;
-        }
-        else
-          cursor++;
-        break;
-      case '\0':
-      case -64:
-        insearch = false;
-        cursor++;
-        break;
-      default:
-        cursor++;
-        break;
-    }
-    // Found it !
-    if (music_found)
-    {
-      cursor_old = cursor + 5;
-      cursor--;
-      espaces_consecutifs = 0;
-      musiques.push_back(vector<char>(0));
-      nombre_musiques++;
-      while (espaces_consecutifs < 3 && cursor >= 0)
-      {
-        musiques[nombre_musiques-1].push_back(contenu_disass[cursor]);
-        if (contenu_disass[cursor] == 32)
-          espaces_consecutifs++;
-        else
-          espaces_consecutifs = 0;
-        cursor--;
-      }
-      // If 3 spaces have been met
-      if (espaces_consecutifs >= 3)
-      {
-        musiques[nombre_musiques-1].pop_back();
-        musiques[nombre_musiques-1].pop_back();
-        musiques[nombre_musiques-1].pop_back();
-      }
-      // Reverse vertex
-      for (unsigned int i = 0 ; i < musiques[nombre_musiques-1].size()/2 ; i++)
-      {
-        bloc_chr = musiques[nombre_musiques-1][i];
-        musiques[nombre_musiques-1][i] = musiques[nombre_musiques-1][musiques[nombre_musiques-1].size()-i-1];
-        musiques[nombre_musiques-1][musiques[nombre_musiques-1].size()-i-1] = bloc_chr;
-      }
-      musiques[nombre_musiques-1].push_back('.');
-      musiques[nombre_musiques-1].push_back(format[0]);
-      musiques[nombre_musiques-1].push_back(format[1]);
-      musiques[nombre_musiques-1].push_back(format[2]);
-      cursor = cursor_old;
-      music_found = false;
-    }
-  }
-
-  // Display soundtracks
-  for (unsigned int i = 0 ; i < musiques.size() ; i++)
-    retour.push_back(vecchar_to_str(musiques[i]));
-
-  fichier.close();
-
-  _wsystem(L"del musiques.txt");
-
-  return retour;
-}
-
-string touche(unsigned int k)
-{
-  switch (k)
-  {
-    case Keyboard::A:
-      return "A";
-      break;
-    case Keyboard::B:
-      return "B";
-      break;
-    case Keyboard::C:
-      return "C";
-      break;
-    case Keyboard::D:
-      return "D";
-      break;
-    case Keyboard::E:
-      return "E";
-      break;
-    case Keyboard::F:
-      return "F";
-      break;
-    case Keyboard::G:
-      return "G";
-      break;
-    case Keyboard::H:
-      return "H";
-      break;
-    case Keyboard::I:
-      return "I";
-      break;
-    case Keyboard::J:
-      return "J";
-      break;
-    case Keyboard::K:
-      return "K";
-      break;
-    case Keyboard::L:
-      return "L";
-      break;
-    case Keyboard::M:
-      return "M";
-      break;
-    case Keyboard::N:
-      return "N";
-      break;
-    case Keyboard::O:
-      return "O";
-      break;
-    case Keyboard::P:
-      return "P";
-      break;
-    case Keyboard::Q:
-      return "Q";
-      break;
-    case Keyboard::R:
-      return "R";
-      break;
-    case Keyboard::S:
-      return "S";
-      break;
-    case Keyboard::T:
-      return "T";
-      break;
-    case Keyboard::U:
-      return "U";
-      break;
-    case Keyboard::V:
-      return "V";
-      break;
-    case Keyboard::W:
-      return "W";
-      break;
-    case Keyboard::X:
-      return "X";
-      break;
-    case Keyboard::Y:
-      return "Y";
-      break;
-    case Keyboard::Z:
-      return "Z";
-      break;
-    case Keyboard::Add:
-      return "+";
-      break;
-    case Keyboard::BackSpace:
-      return "Backspace";
-      break;
-    case Keyboard::Comma:
-      return ",";
-      break;
-    case Keyboard::BackSlash:
-      return "\\";
-      break;
-    case Keyboard::Delete:
-      return "Delete";
-      break;
-    case Keyboard::Divide:
-      return "/";
-      break;
-    case Keyboard::Down:
-      return "Down";
-      break;
-    case Keyboard::Equal:
-      return "=";
-      break;
-    case Keyboard::Insert:
-      return "Insert";
-      break;
-    case Keyboard::Up:
-      return "Up";
-      break;
-    case Keyboard::Tilde:
-      return "%";
-      break;
-    case Keyboard::Tab:
-      return "Tab";
-      break;
-    case Keyboard::Subtract:
-      return "-";
-      break;
-    case Keyboard::Multiply:
-      return "*";
-      break;
-    case Keyboard::Return:
-      return "Return";
-      break;
-    case Keyboard::Num0:
-      return "0";
-      break;
-    case Keyboard::Num1:
-      return "1";
-      break;
-    case Keyboard::Num2:
-      return "2";
-      break;
-    case Keyboard::Num3:
-      return "3";
-      break;
-    case Keyboard::Num4:
-      return "4";
-      break;
-    case Keyboard::Num5:
-      return "5";
-      break;
-    case Keyboard::Num6:
-      return "6";
-      break;
-    case Keyboard::Num7:
-      return "7";
-      break;
-    case Keyboard::Num8:
-      return "8";
-      break;
-    case Keyboard::Num9:
-      return "9";
-      break;
-    case Keyboard::PageDown:
-      return "Page down";
-      break;
-    case Keyboard::PageUp:
-      return "Page up";
-      break;
-    case Keyboard::Numpad0:
-      return "NUMPAD 0";
-      break;
-    case Keyboard::Numpad1:
-      return "NUMPAD 1";
-      break;
-    case Keyboard::Numpad2:
-      return "NUMPAD 2";
-      break;
-    case Keyboard::Numpad3:
-      return "NUMPAD 3";
-      break;
-    case Keyboard::Numpad4:
-      return "NUMPAD 4";
-      break;
-    case Keyboard::Numpad5:
-      return "NUMPAD 5";
-      break;
-    case Keyboard::Numpad6:
-      return "NUMPAD 6";
-      break;
-    case Keyboard::Numpad7:
-      return "NUMPAD 7";
-      break;
-    case Keyboard::Numpad8:
-      return "NUMPAD 8";
-      break;
-    case Keyboard::Numpad9:
-      return "NUMPAD 9";
-      break;
-    case Keyboard::Period:
-      return ";";
-      break;
-    case Keyboard::Slash:
-      return ":";
-      break;
-    case Keyboard::Dash:
-      return "Dash";
-      break;
-    case Keyboard::SemiColon:
-      return "Semicolon";
-      break;
-    case Keyboard::Right:
-      return "Right";
-      break;
-    case Keyboard::Left:
-      return "Left";
-      break;
-    case Keyboard::Space:
-      return "Space";
-      break;
-    case Keyboard::End:
-      return "End";
-      break;
-    case Keyboard::F1:
-      return "F1";
-      break;
-    case Keyboard::F2:
-      return "F2";
-      break;
-    case Keyboard::F3:
-      return "F3";
-      break;
-    case Keyboard::F4:
-      return "F4";
-      break;
-    case Keyboard::F5:
-      return "F5";
-      break;
-    case Keyboard::F6:
-      return "F6";
-      break;
-    case Keyboard::F7:
-      return "F7";
-      break;
-    case Keyboard::F8:
-      return "F8";
-      break;
-    case Keyboard::F9:
-      return "F9";
-      break;
-    case Keyboard::F10:
-      return "F10";
-      break;
-    case Keyboard::F11:
-      return "F11";
-      break;
-    case Keyboard::F12:
-      return "F12";
-      break;
-    case Keyboard::Quote:
-      return "²";
-      break;
-    case Keyboard::Unknown:
-      return "None";
-      break;
-    default:
-      return "None";
-      break;
-  }
-}
-
-int taille_nombre(int n)
-{
-  int retour = (n < 0)
-               ? (int)log10(max(1,abs(n)))+2
-               : (int)log10(max(1,abs(n)))+1;
-  return retour;
-}
-
-Int32 monster_formula(Int32 t)
-{
-  return (3000-5*t)*(t+1);
-}
-
-Int32 bonus_formula(Int32 t)
-{
-  return (30000-30*t)*(t+1);
-}
-
-Int32 epolar_formula(Int32 t)
-{
-  return (44000-50*t)*(t+1);
-}
-
-float objectif_y(Vector2f pos_a, Vector2f pos_b, float x)
-{
-  float y = 0.0f;
-  float a = (pos_b.y - pos_a.y)/(pos_b.x - pos_a.x);
-  float b = pos_a.y - a*pos_a.x;
-  y = a*x + b;
-  return y;
-}
-
-float objectif_x(Vector2f pos_a, Vector2f pos_b, float y)
-{
-  float x = 0.0f;
-  float a = (pos_b.y - pos_a.y)/(pos_b.x - pos_a.x);
-  float b = pos_a.y - a*pos_a.x;
-  x = (y-b)/a;
-  return x;
-}
-
-bool contact(Vector2f pos_a, FloatRect localb_a, Vector2f pos_b, FloatRect localb_b, float marge = 0.0f)
-{
-  float _x_a = pos_a.x;
-  float _x_b = pos_b.x;
-  float _y_a = pos_a.y;
-  float _y_b = pos_b.y;
-
-  float _w_a = localb_a.width;
-  float _w_b = localb_b.width;
-  float _h_a = localb_a.height;
-  float _h_b = localb_b.height;
-
-  return (_x_a + _w_a >= _x_b + marge &&
-          _x_a + marge <= _x_b + _w_b &&
-          _y_a + _h_a >= _y_b + marge &&
-          _y_a + marge <= _y_b + _h_b);
-}
-
 int main()
 {
-  /// Console Management
-  /* for developer
-  HANDLE _console = GetStdHandle(STD_OUTPUT_HANDLE);
-  #define color(l) SetConsoleTextAttribute(_console, l)
-  */
   /// Network Management and File Transfer Protocol
   ifstream _sb_amont; // This is also used in order to get monster sprites and to get settings
   ofstream _sb_aval;
@@ -803,14 +170,14 @@ int main()
   IntRect _backgroundRocksRect({_backgroundRocksInt[_backgroundRocksIndex], 0, _backgroundRocksInt[_backgroundRocksIndex+1],400});
   _backgroundRocksImg.loadFromFile("assets/images/rocks.bmp");
   _backgroundRocksImg.createMaskFromColor(Color(000,255,000));
-  _backgroundRocksImg = niveau_gris(_backgroundRocksImg);
+  _backgroundRocksImg = grayscale(_backgroundRocksImg);
   _backgroundRocksText.loadFromImage(_backgroundRocksImg);
   Image _mysteryBoatImg;
   Texture _mysteryBoatText;
   Int32 _mysteryBoatNext = 30000;
   _mysteryBoatImg.loadFromFile("assets/images/mysteryboat.bmp");
   _mysteryBoatImg.createMaskFromColor(Color(000,255,000));
-  _mysteryBoatImg = niveau_gris(_mysteryBoatImg);
+  _mysteryBoatImg = grayscale(_mysteryBoatImg);
   _mysteryBoatText.loadFromImage(_mysteryBoatImg);
   Sprite _mysteryBoat(_mysteryBoatText);
   _mysteryBoat.setColor(Color(000,000,127));
@@ -1333,7 +700,7 @@ int main()
   float _monsterSpeed = MONSTER_INIT_SPEED;
   // Compteurs
   int _monsterCount = 0;
-  int _monsterTotal = 0; // Augmente avec la fonction monster_formula(t)
+  int _monsterTotal = 0; // Augmente avec la fonction nextMonsterSpawnDate(t)
   /// Epolar Sprite
   Image _epolarImg;
   Texture _epolarText;
@@ -1551,7 +918,7 @@ int main()
   /// Music Manager
   Music _music;
   float _music_volume = 45.0f;
-  vector<string> _music_list = rechercher_musiques();
+  vector<string> _music_list = browseMusic();
   if (_music_list.size() == 0)
   {
     _music.openFromFile("assets/audio/default.ogg");
@@ -1854,7 +1221,7 @@ int main()
     (WIN_WIDTH-_menuJaugeFond[JAUGE_SON]->getLocalBounds().width)/2,
     (WIN_HEIGHT-_menuJaugeFond[JAUGE_SON]->getLocalBounds().height)/4);
   _menuJaugeCursor[JAUGE_SON]->setPosition(_menuJaugeFond[JAUGE_SON]->getPosition().x + _firehorn_volume*(729.0f - _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width)/100.0f, _menuJaugeFond[JAUGE_SON]->getPosition().y);
-  _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+int_to_string(static_cast<int>(_firehorn_volume))+" %");
+  _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+intToString(static_cast<int>(_firehorn_volume))+" %");
   _menuTxtJauge[JAUGE_SON]->setPosition(_menuJaugeFond[JAUGE_SON]->getPosition().x + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().width - _menuTxtJauge[JAUGE_SON]->getLocalBounds().width )/2, _menuJaugeFond[JAUGE_SON]->getPosition().y + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().height-_menuTxtJauge[JAUGE_SON]->getLocalBounds().height)/4);
   _menuJaugeFond[JAUGE_MUSIQUE]->setPosition(
     (WIN_WIDTH-_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width)/2,
@@ -1862,7 +1229,7 @@ int main()
   _menuJaugeCursor[JAUGE_MUSIQUE]->setPosition(
     _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + _music_volume*(729.0f - _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width)/100.0f,
     _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y);
-  _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique :"+int_to_string(static_cast<int>(_music_volume))+" %");
+  _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique :"+intToString(static_cast<int>(_music_volume))+" %");
   _menuTxtJauge[JAUGE_MUSIQUE]->setPosition(_menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width - _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().width )/2,
       _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y +
       (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height-
@@ -1959,7 +1326,7 @@ int main()
   _menuBarre[BUT_KEY_FORWARD]->setPosition((WIN_WIDTH
       -_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().width) /2,
       (WIN_HEIGHT-_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().height)/2 - 40);
-  _menuTxtBarre[BUT_KEY_FORWARD]->setString("Go right : "+touche(_keyid[KEYB_FORWARD]));
+  _menuTxtBarre[BUT_KEY_FORWARD]->setString("Go right : "+keystring(_keyid[KEYB_FORWARD]));
   _menuTxtBarre[BUT_KEY_FORWARD]->setPosition(_menuBarre[BUT_KEY_FORWARD]->getPosition().x + (_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_FORWARD]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_FORWARD]->getPosition().y +
@@ -1969,7 +1336,7 @@ int main()
                                           -_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().width) /2,
                                           _menuBarre[BUT_KEY_FORWARD]->getPosition().y -
                                           _menuBarre[BUT_KEY_GODOWN]->getLocalBounds().height - 15);
-  _menuTxtBarre[BUT_KEY_GODOWN]->setString("Go down : "+touche(_keyid[KEYB_GODOWN]));
+  _menuTxtBarre[BUT_KEY_GODOWN]->setString("Go down : "+keystring(_keyid[KEYB_GODOWN]));
   _menuTxtBarre[BUT_KEY_GODOWN]->setPosition(_menuBarre[BUT_KEY_GODOWN]->getPosition().x + (_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_GODOWN]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_GODOWN]->getPosition().y +
@@ -1979,7 +1346,7 @@ int main()
                                          -_menuBarre[BUT_KEY_GOUP]->getLocalBounds().width) /2,
                                         _menuBarre[BUT_KEY_GODOWN]->getPosition().y -
                                         _menuBarre[BUT_KEY_GOUP]->getLocalBounds().height - 15);
-  _menuTxtBarre[BUT_KEY_GOUP]->setString("Go up : "+touche(_keyid[KEYB_GOUP]));
+  _menuTxtBarre[BUT_KEY_GOUP]->setString("Go up : "+keystring(_keyid[KEYB_GOUP]));
   _menuTxtBarre[BUT_KEY_GOUP]->setPosition(_menuBarre[BUT_KEY_GOUP]->getPosition().x + (_menuBarre[BUT_KEY_GOUP]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_GOUP]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_GOUP]->getPosition().y +
@@ -1989,7 +1356,7 @@ int main()
       -_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().width) /2,
       _menuBarre[BUT_KEY_GOUP]->getPosition().y -
       _menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().height - 15);
-  _menuTxtBarre[BUT_KEY_BACKWARD]->setString("Go left : "+touche(_keyid[KEYB_BACKWARD]));
+  _menuTxtBarre[BUT_KEY_BACKWARD]->setString("Go left : "+keystring(_keyid[KEYB_BACKWARD]));
   _menuTxtBarre[BUT_KEY_BACKWARD]->setPosition(_menuBarre[BUT_KEY_BACKWARD]->getPosition().x + (_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_BACKWARD]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_BACKWARD]->getPosition().y +
@@ -1999,7 +1366,7 @@ int main()
       -_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width) /2,
       _menuBarre[BUT_KEY_FORWARD]->getPosition().y +
       _menuBarre[BUT_KEY_FORWARD]->getLocalBounds().height + 15);
-  _menuTxtBarre[BUT_KEY_ACCERELATE]->setString("Accelerate : "+touche(_keyid[KEYB_ACCELERATE]));
+  _menuTxtBarre[BUT_KEY_ACCERELATE]->setString("Accelerate : "+keystring(_keyid[KEYB_ACCELERATE]));
   _menuTxtBarre[BUT_KEY_ACCERELATE]->setPosition(_menuBarre[BUT_KEY_ACCERELATE]->getPosition().x +
       (_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width -
        _menuTxtBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width )/2,
@@ -2010,7 +1377,7 @@ int main()
       -_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().width) /2,
       _menuBarre[BUT_KEY_ACCERELATE]->getPosition().y +
       _menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().height + 15);
-  _menuTxtBarre[BUT_KEY_FIREBALL]->setString("Fire : "+touche(_keyid[KEYB_FIREBALL]));
+  _menuTxtBarre[BUT_KEY_FIREBALL]->setString("Fire : "+keystring(_keyid[KEYB_FIREBALL]));
   _menuTxtBarre[BUT_KEY_FIREBALL]->setPosition(_menuBarre[BUT_KEY_FIREBALL]->getPosition().x + (_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_FIREBALL]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_FIREBALL]->getPosition().y +
@@ -2020,7 +1387,7 @@ int main()
       -_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().width) /2,
       _menuBarre[BUT_KEY_FIREBALL]->getPosition().y +
       _menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().height + 15);
-  _menuTxtBarre[BUT_KEY_FPSDISP]->setString("Afficher les FPS : "+touche(_keyid[KEYB_FIREBALL]));
+  _menuTxtBarre[BUT_KEY_FPSDISP]->setString("Afficher les FPS : "+keystring(_keyid[KEYB_FIREBALL]));
   _menuTxtBarre[BUT_KEY_FPSDISP]->setPosition(_menuBarre[BUT_KEY_FPSDISP]->getPosition().x + (_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_FPSDISP]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_FPSDISP]->getPosition().y +
@@ -2182,7 +1549,7 @@ int main()
                 _formulaireVecchar.push_back(static_cast<char>(_event.text.unicode));
               break;
           }
-          _formulaireStr = vecchar_to_str(_formulaireVecchar);
+          _formulaireStr = charListToString(_formulaireVecchar);
           _formulaireText.setString(_formulaireStr);
         }
         else if (_event.type != Event::TextEntered)
@@ -2599,7 +1966,7 @@ int main()
         }
         /// Monsters
         // Spawning
-        if (_t_passedInGame >= monster_formula(_monsterTotal))
+        if (_t_passedInGame >= nextMonsterSpawnDate(_monsterTotal))
         {
           for (unsigned int i = 0 ; i < MAX_MONSTER ; ++i)
           {
@@ -2700,7 +2067,7 @@ int main()
         }
         /// Bonus Apparition
         // Spawning
-        if (_t_passedInGame >= bonus_formula(_bonusCount))
+        if (_t_passedInGame >= nextBonusSpawnDate(_bonusCount))
         {
           for (unsigned int i = 0 ; i < MAX_BONUS ; ++i)
           {
@@ -2758,7 +2125,7 @@ int main()
             FBEFFECT_DURATION) _dragonFireballPowered = false;
         /// Epolar Boss
         // Spawning
-        if (_t_passedInGame >= epolar_formula(_epolarTotalCount))
+        if (_t_passedInGame >= nextEpolarSpawnDate(_epolarTotalCount))
         {
           for (unsigned int i = 0 ; i < MAX_EPOLAR ; i++)
           {
@@ -4071,7 +3438,7 @@ int main()
           case MENU_TOUCHES:
             _window.draw(*_menuBarre[BUT_RETOUR_MAIN]);
             _window.draw(*_menuTxtBarre[BUT_RETOUR_MAIN]);
-            _menuTxtBarre[BUT_KEY_ACCERELATE]->setString("Accélérer : "+touche(_keyid[KEYB_ACCELERATE]));
+            _menuTxtBarre[BUT_KEY_ACCERELATE]->setString("Accélérer : "+keystring(_keyid[KEYB_ACCELERATE]));
             _menuTxtBarre[BUT_KEY_ACCERELATE]->setPosition(_menuBarre[BUT_KEY_ACCERELATE]->getPosition().x +
                 (_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width -
                  _menuTxtBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width )/2,
@@ -4080,7 +3447,7 @@ int main()
                  _menuTxtBarre[BUT_KEY_ACCERELATE]->getLocalBounds().height)/4);
             _window.draw(*_menuBarre[BUT_KEY_ACCERELATE]);
             _window.draw(*_menuTxtBarre[BUT_KEY_ACCERELATE]);
-            _menuTxtBarre[BUT_KEY_FORWARD]->setString("Aller vers la droite : "+touche(_keyid[KEYB_FORWARD]));
+            _menuTxtBarre[BUT_KEY_FORWARD]->setString("Aller vers la droite : "+keystring(_keyid[KEYB_FORWARD]));
             _menuTxtBarre[BUT_KEY_FORWARD]->setPosition(_menuBarre[BUT_KEY_FORWARD]->getPosition().x + (_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().width -
                 _menuTxtBarre[BUT_KEY_FORWARD]->getLocalBounds().width )/2,
                 _menuBarre[BUT_KEY_FORWARD]->getPosition().y +
@@ -4088,7 +3455,7 @@ int main()
                  _menuTxtBarre[BUT_KEY_FORWARD]->getLocalBounds().height)/4);
             _window.draw(*_menuBarre[BUT_KEY_FORWARD]);
             _window.draw(*_menuTxtBarre[BUT_KEY_FORWARD]);
-            _menuTxtBarre[BUT_KEY_FPSDISP]->setString("Afficher les FPS : "+touche(_keyid[KEYB_FPSDISP]));
+            _menuTxtBarre[BUT_KEY_FPSDISP]->setString("Afficher les FPS : "+keystring(_keyid[KEYB_FPSDISP]));
             _menuTxtBarre[BUT_KEY_FPSDISP]->setPosition(_menuBarre[BUT_KEY_FPSDISP]->getPosition().x + (_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().width -
                 _menuTxtBarre[BUT_KEY_FPSDISP]->getLocalBounds().width )/2,
                 _menuBarre[BUT_KEY_FPSDISP]->getPosition().y +
@@ -4096,7 +3463,7 @@ int main()
                  _menuTxtBarre[BUT_KEY_FPSDISP]->getLocalBounds().height)/4);
             _window.draw(*_menuBarre[BUT_KEY_FPSDISP]);
             _window.draw(*_menuTxtBarre[BUT_KEY_FPSDISP]);
-            _menuTxtBarre[BUT_KEY_FIREBALL]->setString("Tirer : "+touche(_keyid[KEYB_FIREBALL]));
+            _menuTxtBarre[BUT_KEY_FIREBALL]->setString("Tirer : "+keystring(_keyid[KEYB_FIREBALL]));
             _menuTxtBarre[BUT_KEY_FIREBALL]->setPosition(_menuBarre[BUT_KEY_FIREBALL]->getPosition().x + (_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().width -
                 _menuTxtBarre[BUT_KEY_FIREBALL]->getLocalBounds().width )/2,
                 _menuBarre[BUT_KEY_FIREBALL]->getPosition().y +
@@ -4104,7 +3471,7 @@ int main()
                  _menuTxtBarre[BUT_KEY_FIREBALL]->getLocalBounds().height)/4);
             _window.draw(*_menuBarre[BUT_KEY_FIREBALL]);
             _window.draw(*_menuTxtBarre[BUT_KEY_FIREBALL]);
-            _menuTxtBarre[BUT_KEY_GOUP]->setString("Aller vers le haut : "+touche(_keyid[KEYB_GOUP]));
+            _menuTxtBarre[BUT_KEY_GOUP]->setString("Aller vers le haut : "+keystring(_keyid[KEYB_GOUP]));
             _menuTxtBarre[BUT_KEY_GOUP]->setPosition(_menuBarre[BUT_KEY_GOUP]->getPosition().x + (_menuBarre[BUT_KEY_GOUP]->getLocalBounds().width -
                 _menuTxtBarre[BUT_KEY_GOUP]->getLocalBounds().width )/2,
                 _menuBarre[BUT_KEY_GOUP]->getPosition().y +
@@ -4112,7 +3479,7 @@ int main()
                  _menuTxtBarre[BUT_KEY_GOUP]->getLocalBounds().height)/4);
             _window.draw(*_menuBarre[BUT_KEY_GOUP]);
             _window.draw(*_menuTxtBarre[BUT_KEY_GOUP]);
-            _menuTxtBarre[BUT_KEY_BACKWARD]->setString("Aller vers la gauche : "+touche(_keyid[KEYB_BACKWARD]));
+            _menuTxtBarre[BUT_KEY_BACKWARD]->setString("Aller vers la gauche : "+keystring(_keyid[KEYB_BACKWARD]));
             _menuTxtBarre[BUT_KEY_BACKWARD]->setPosition(_menuBarre[BUT_KEY_BACKWARD]->getPosition().x + (_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().width -
                 _menuTxtBarre[BUT_KEY_BACKWARD]->getLocalBounds().width )/2,
                 _menuBarre[BUT_KEY_BACKWARD]->getPosition().y +
@@ -4120,7 +3487,7 @@ int main()
                  _menuTxtBarre[BUT_KEY_BACKWARD]->getLocalBounds().height)/4);
             _window.draw(*_menuBarre[BUT_KEY_BACKWARD]);
             _window.draw(*_menuTxtBarre[BUT_KEY_BACKWARD]);
-            _menuTxtBarre[BUT_KEY_GODOWN]->setString("Aller vers le bas : "+touche(_keyid[KEYB_GODOWN]));
+            _menuTxtBarre[BUT_KEY_GODOWN]->setString("Aller vers le bas : "+keystring(_keyid[KEYB_GODOWN]));
             _menuTxtBarre[BUT_KEY_GODOWN]->setPosition(_menuBarre[BUT_KEY_GODOWN]->getPosition().x + (_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().width -
                 _menuTxtBarre[BUT_KEY_GODOWN]->getLocalBounds().width )/2,
                 _menuBarre[BUT_KEY_GODOWN]->getPosition().y +
@@ -4132,7 +3499,7 @@ int main()
           case MENU_MUSIQUE:
             _window.draw(*_menuJaugeFond[JAUGE_SON]);
             _window.draw(*_menuJaugeCursor[JAUGE_SON]);
-            _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+int_to_string(static_cast<int>(_firehorn_volume))+" %");
+            _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+intToString(static_cast<int>(_firehorn_volume))+" %");
             _menuTxtJauge[JAUGE_SON]->setPosition(_menuJaugeFond[JAUGE_SON]->getPosition().x + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().width -
                                                   _menuTxtJauge[JAUGE_SON]->getLocalBounds().width )/2,
                                                   _menuJaugeFond[JAUGE_SON]->getPosition().y +
@@ -4141,7 +3508,7 @@ int main()
             _window.draw(*_menuTxtJauge[JAUGE_SON]);
             _window.draw(*_menuJaugeFond[JAUGE_MUSIQUE]);
             _window.draw(*_menuJaugeCursor[JAUGE_MUSIQUE]);
-            _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique : "+int_to_string(static_cast<int>(_music_volume))+" %");
+            _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique : "+intToString(static_cast<int>(_music_volume))+" %");
             _menuTxtJauge[JAUGE_MUSIQUE]->setPosition(_menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width -
                 _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().width )/2,
                 _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y +

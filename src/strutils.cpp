@@ -2,7 +2,7 @@
 
 using namespace std;
 
-vector<char> str_to_vecchar(string s)
+vector<char> stringToCharList(string s)
 {
   const char * chaine = s.c_str();
   unsigned int i = 0;
@@ -16,7 +16,7 @@ vector<char> str_to_vecchar(string s)
   return retour;
 }
 
-string vecchar_to_str(vector<char> v)
+string charListToString(vector<char> v)
 {
   char *chaine = (char*) malloc (sizeof(char) * v.size() + 1);
   for (unsigned int i = 0 ; i < v.size() ; i++)
@@ -27,15 +27,7 @@ string vecchar_to_str(vector<char> v)
   return retour;
 }
 
-string float_to_string(float f)
-{
-  char c[] = "";
-  sprintf(c, "%f", f);
-  string r = c;
-  return r;
-}
-
-string int_to_string(int i)
+string intToString(int i)
 {
   char c[] = "";
   sprintf(c, "%d", i);

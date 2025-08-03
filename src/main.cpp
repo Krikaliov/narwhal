@@ -1,5 +1,8 @@
 #include "utils.h"
 #include "strutils.h"
+#include "windows.h"
+#include "cursor.h"
+#include "event_manager.h"
 
 using namespace sf;
 using namespace std;
@@ -12,26 +15,76 @@ int main()
   TcpSocket _socket;
   IpAddress _gtaddress;
   Ftp _client;
+  /// Open Launcher
+  Font _narwhalFont;
+  if (!_narwhalFont.loadFromFile("assets/fonts/narwhal.ttf"))
+  {
+    return 1;
+  }
+  Font _basicFont;
+  if (!_basicFont.loadFromFile("assets/fonts/consola.ttf"))
+  {
+    return 1;
+  }
+  Image _launcher_backgroundImg;
+  Texture _launcher_backgroundTxt;
+  Sprite _launcher_background;
+  N::WindowsAssert(_launcher_backgroundImg.loadFromFile("assets/images/launcher_background.png"), "Impossible de charger la texture du fond du launcher!");
+  _launcher_backgroundTxt.loadFromImage(_launcher_backgroundImg);
+  _launcher_background.setTexture(_launcher_backgroundTxt, true);
+  Text _signGame("Narwhal", _narwhalFont, 144);
+  _signGame.setStyle(Text::Bold);
+  _signGame.setFillColor(Color(199,199,255));
+  _signGame.setPosition((WIN_W - _signGame.getLocalBounds().width) /
+                        2.00f, (WIN_H - _signGame.getLocalBounds().height)/
+                        5.00f);
+  Image _formulaireImg;
+  Texture _formulaireTxt;
+  Sprite _formulaire;
+  N::WindowsAssert(_formulaireImg.loadFromFile("assets/images/formulaire.bmp"), "Impossible de charger la texture du formulaire!");
+  _formulaireTxt.loadFromImage(_formulaireImg);
+  _formulaire.setTexture(_formulaireTxt, true);
+  _formulaire.setPosition((WIN_W - _formulaire.getLocalBounds().width) /
+                          2.00f, (WIN_H - _formulaire.getLocalBounds().height)/
+                          1.62f);
+  Text _enterYourPseudo("Chargement du jeu en cours...", _basicFont, 32);
+  _enterYourPseudo.setFillColor(Color(255,255,255));
+  _enterYourPseudo.setPosition(_formulaire.getPosition().x + 7.0f,
+                               _formulaire.getPosition().y -
+                               _enterYourPseudo.getLocalBounds().height - 15.0f);
+  Image _windowIcon;
+  N::WindowsAssert(_windowIcon.loadFromFile("assets/images/narwhal_icon.ico"), "Impossible de charger l'icône du jeu");
+  RenderWindow _windowLauncher(VideoMode(WIN_W,WIN_H), "Narwhal Launcher");
+  _windowLauncher.setIcon(32, 32, _windowIcon.getPixelsPtr());
+  _windowLauncher.requestFocus();
+  _windowLauncher.draw(_launcher_background);
+  _windowLauncher.draw(_signGame);
+  _windowLauncher.draw(_enterYourPseudo);
+  _windowLauncher.display();
   bool _connected(true);
-  if (_socket.connect("62.4.29.249", 21) != Socket::Done)
+  if (_socket.connect("62.4.29.249", 21, seconds(4)) != Socket::Done)
+  {
     _connected = false;
+    N::WindowsAssert(false, "La connexion au serveur est impossible ! Vous pouvez quand même\njouer au jeu mais votre score ne sera pas enregistré.\nFermez cette fenêtre pour accéder au launcher.");
+  }
   else
+  {
     _gtaddress = _socket.getRemoteAddress();
+    _client.connect(_gtaddress).getMessage();
+    if (!_client.login("297899_narwhal141", "rt29xk").isOk())
+    {
+      _connected = false;
+      N::WindowsAssert(false, "La version de votre jeu est trop obsolète pour enregistrer votre score\nou le service Narwhal a fermé ses portes (date de fermeture : 13/07/2022)");
+    }
+    else
+    {
+      _client.download("hanouna.png", "assets/images").getMessage();
+      _client.download("hanouna.txt", "assets/images", Ftp::Ascii).getMessage();
+      _client.disconnect().getMessage();
+    }
+  }
   /// Event Manager
-  bool* _key = (bool*) malloc (sizeof(bool) * Keyboard::KeyCount);
-  for ( int i = 0 ; i < Keyboard::KeyCount ; ++i) _key[i] = false;
-  bool* _keypressed = (bool*) malloc (sizeof(bool) * Keyboard::KeyCount
-                                     );
-  for ( int i = 0 ; i < Keyboard::KeyCount ; ++i) _keypressed[i] = false
-        ;
-  bool* _button = (bool*) malloc (sizeof(bool) * Mouse::ButtonCount);
-  for ( int i = 0 ; i < Mouse::ButtonCount ; ++i) _button[i] = false;
-  bool* _buttonpressed = (bool*) malloc (sizeof(bool) * Mouse::
-                                         ButtonCount);
-  for ( int i = 0 ; i < Mouse::ButtonCount ; ++i) _buttonpressed[i] =
-      false;
   bool _textEntered(false);
-  Event _event;
   srand(static_cast<unsigned int>(time(NULL)));
   bool _playerIsInLauncher(true);
   bool _playerIsInGame(false);
@@ -50,16 +103,6 @@ int main()
   // Initialization
   Font _policeFont;
   if (!_policeFont.loadFromFile("assets/fonts/angelina.ttf"))
-  {
-    return 1;
-  }
-  Font _basicFont;
-  if (!_basicFont.loadFromFile("assets/fonts/consola.ttf"))
-  {
-    return 1;
-  }
-  Font _narwhalFont;
-  if (!_narwhalFont.loadFromFile("assets/fonts/narwhal.ttf"))
   {
     return 1;
   }
@@ -87,74 +130,9 @@ int main()
                          _error.getPosition().y + _error.getLocalBounds
                          ().height + 15.0f);
   RenderWindow _windowError;
-  /// Cursor
-  Image _cursorImg;
-  Texture _cursorTxt;
-  Sprite _cursor;
-  _cursorImg.loadFromFile("assets/images/cursor.png");
-  _cursorImg.createMaskFromColor(Color(000,255,000));
-  _cursorTxt.loadFromImage(_cursorImg);
-  _cursor.setTexture(_cursorTxt);
-  _cursor.setTextureRect(CURSOR_NORMAL);
-  ShowCursor(FALSE);
   /// Background
   Image _backgroundImg;
-  if (!_backgroundImg.loadFromFile("assets/images/background3d.jpg"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger la texture de fond !"
-                        );
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) // Keyboard
-        {
-          if (_event.type == Event::KeyPressed && _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased&& _event.key.
-              code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type == Event::
-              MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type == Event::
-              MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError
-                                                      ));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_backgroundImg.loadFromFile("assets/images/background3d.jpg"), "Impossible de charger la texture de fond!");
   IntRect _backgroundRect(0, 0, 1366, 768);
   Texture _backgroundText;
   int _backgroundLight = 255;
@@ -168,115 +146,24 @@ int main()
   int _backgroundRocksIndex = 0;
   Int32 _backgroundNextRock = 0;
   IntRect _backgroundRocksRect({_backgroundRocksInt[_backgroundRocksIndex], 0, _backgroundRocksInt[_backgroundRocksIndex+1],400});
-  _backgroundRocksImg.loadFromFile("assets/images/rocks.bmp");
+  N::WindowsAssert(_backgroundRocksImg.loadFromFile("assets/images/rocks.bmp"), "Impossible de charger la texture des rochers!");
   _backgroundRocksImg.createMaskFromColor(Color(000,255,000));
-  _backgroundRocksImg = grayscale(_backgroundRocksImg);
+  _backgroundRocksImg = N::grayscale(_backgroundRocksImg);
   _backgroundRocksText.loadFromImage(_backgroundRocksImg);
   Image _mysteryBoatImg;
   Texture _mysteryBoatText;
   Int32 _mysteryBoatNext = 30000;
-  _mysteryBoatImg.loadFromFile("assets/images/mysteryboat.bmp");
+  N::WindowsAssert(_mysteryBoatImg.loadFromFile("assets/images/mysteryboat.bmp"), "Impossible de charger la texture du mystérieux bateau!");
   _mysteryBoatImg.createMaskFromColor(Color(000,255,000));
-  _mysteryBoatImg = grayscale(_mysteryBoatImg);
+  _mysteryBoatImg = N::grayscale(_mysteryBoatImg);
   _mysteryBoatText.loadFromImage(_mysteryBoatImg);
   Sprite _mysteryBoat(_mysteryBoatText);
   _mysteryBoat.setColor(Color(000,000,127));
   _mysteryBoat.move(-_mysteryBoat.getLocalBounds().width, -_mysteryBoat
                     .getLocalBounds().height);
-  Image _launcher_backgroundImg;
-  Texture _launcher_backgroundTxt;
-  Sprite _launcher_background;
-  _launcher_backgroundImg.loadFromFile(
-    "assets/images/launcher_background.png");
-  _launcher_backgroundTxt.loadFromImage(_launcher_backgroundImg);
-  _launcher_background.setTexture(_launcher_backgroundTxt, true);
-  /// Open Launcher
-  Text _signGame("Narwhal", _narwhalFont, 144);
-  _signGame.setStyle(Text::Bold);
-  _signGame.setFillColor(Color(199,199,255));
-  _signGame.setPosition((WIN_W - _signGame.getLocalBounds().width) /
-                        2.00f, (WIN_H - _signGame.getLocalBounds().height)/
-                        5.00f);
-  Image _formulaireImg;
-  Texture _formulaireTxt;
-  Sprite _formulaire;
-  _formulaireImg.loadFromFile("assets/images/formulaire.bmp");
-  _formulaireTxt.loadFromImage(_formulaireImg);
-  _formulaire.setTexture(_formulaireTxt, true);
-  _formulaire.setPosition((WIN_W - _formulaire.getLocalBounds().width) /
-                          2.00f, (WIN_H - _formulaire.getLocalBounds().height)/
-                          1.62f);
-  Text _enterYourPseudo("Chargement du jeu en cours...", _basicFont, 32);
-  _enterYourPseudo.setFillColor(Color(255,255,255));
-  _enterYourPseudo.setPosition(_formulaire.getPosition().x + 7.0f,
-                               _formulaire.getPosition().y -
-                               _enterYourPseudo.getLocalBounds().height - 15.0f);
-  Image _windowIcon;
-  _windowIcon.loadFromFile("assets/images/narwhal_icon.ico");
-  RenderWindow _windowLauncher(VideoMode(WIN_W,WIN_H), "Narwhal Launcher");
-  _windowLauncher.setIcon(32, 32, _windowIcon.getPixelsPtr());
-  _windowLauncher.requestFocus();
-  _windowLauncher.draw(_launcher_background);
-  _windowLauncher.draw(_signGame);
-  _windowLauncher.draw(_enterYourPseudo);
-  _windowLauncher.display();
   /// Bonus
   Image _bonusImg;
-  if (!_bonusImg.loadFromFile("assets/images/bonus.png"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger le sprite des bonus");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) // Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased &&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_bonusImg.loadFromFile("assets/images/bonus.png"), "Impossible de charger le sprite des bonus!");
   _bonusImg.createMaskFromColor(Color(000,255,000));
   Texture _bonusText;
   _bonusText.loadFromImage(_bonusImg);
@@ -302,69 +189,12 @@ int main()
   IntRect _dragonRect(239, 0, 239, 200); // Initial dragon section sprite
   Clock _dragonTime; // For animation
   Int32 _dragonGotPowered = 0; // When has the dragon drunk the potion ?
-  int _dragonSect[11] = {2, 242, 481, 719, 959, 1195, 1434, 1673, 1912,
-                         2151, 2390
-                        }; // Limit pixels between each dragon
+  int _dragonSect[11] = {2, 242, 481, 719, 959, 1195, 1434, 1673, 1912, 2151, 2390}; // Limit pixels between each dragon
   int _dragonActualSect(1); // 1 -> 10 (different dragon sprite sections)
   float _dragonSpeed(0.0f);
   int _dragonAnimSpeed = NORMAL_SPEED_ANIM;
   int _dragonKill(0);
-  if (!_dragonImg.loadFromFile("assets/images/narwhal.bmp"))
-    // Load Image
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger Narwhal ! :'(");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased&&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_dragonImg.loadFromFile("assets/images/narwhal.bmp"), "Impossible de charger le sprite de Narwhal!");
   _dragonImg.createMaskFromColor(Color(000,255,000)); // Mask green
   _dragonText.loadFromImage(_dragonImg); // Load Texture
   _dragonText.setSmooth(true);
@@ -372,253 +202,22 @@ int main()
   /// Fireball Sprite
   Image _fireballImg; // Image
   Texture _fireballText; // Texture
-  IntRect _fireballSect[2] = {{0, 0, 94, 47},
-    {95, 0, 94, 47}
-  }; // Limit pixels between each fireball
+  IntRect _fireballSect[2] = {{0, 0, 94, 47}, {95, 0, 94, 47}}; // Limit pixels between each fireball
   bool _fireballThrown(false); // Check if a fireball has been thrown by Bluko
-  if (!_fireballImg.loadFromFile("assets/images/bouledefeu.bmp"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger le sprite des cornes");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased&&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_fireballImg.loadFromFile("assets/images/bouledefeu.bmp"), "Impossible de charger le sprite des cornes!");
   _fireballImg.createMaskFromColor(Color(000,255,000)); // Mask green
   _fireballText.loadFromImage(_fireballImg);
   Sprite *_fireball[MAX_FIREBALL] = {0};
   /// Monster Sprite
   Image _monsterImg;
   Texture _monsterText;
-  // get monster sprites
-  if (_connected)
-  {
-    _client.connect(_gtaddress, 21).getMessage();
-    if (!_client.login("297899_narwhal141", "rt29xk").isOk())
-    {
-      _connected = false;
-      _windowError.create(VideoMode(858,570), "Narwhal Bug");
-      _errorText.setString("La version de votre jeu est trop obsolète pour enregistrer votre score\nou le service Narwhal a fermé ses portes (date de fermeture : 13/07/2022");
-      _windowError.requestFocus();
-      while (_windowError.isOpen())
-      {
-        // Key binding
-        if (_windowError.pollEvent(_event))
-        {
-          if (_event.type == Event::Closed)
-          {
-            _windowError.close();
-          }
-          for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-          {
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code == i)
-            {
-              _key[i] = true;
-            }
-            if (_event.type == Event::KeyReleased&&
-                _event.key.code == i)
-            {
-              _key[i] = false;
-              _keypressed[i] = false;
-            }
-            if (i < Mouse::ButtonCount && _event.type ==
-                Event::MouseButtonPressed && _event.mouseButton.button == i)
-            {
-              _button[i] = true;
-            }
-            if (i < Mouse::ButtonCount && _event.type ==
-                Event::MouseButtonReleased&& _event.mouseButton.button == i)
-            {
-              _button[i] = false;
-              _buttonpressed[i] = false;
-            }
-          }
-        }
-        // Key activate
-        if (_key[Keyboard::Escape] &&
-            !_keypressed[Keyboard::Escape])
-        {
-          _windowError.close();
-          _keypressed[Keyboard::Escape] = true;
-        }
-        _windowError.clear();
-        _windowError.draw(_errorBgd);
-        _windowError.draw(_error);
-        _windowError.draw(_errorText);
-        _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-        _windowError.draw(_cursor);
-        _windowError.display();
-      }
-    }
-    else
-    {
-      _client.download("hanouna.png", "assets/images").getMessage();
-      _client.download("hanouna.txt", "assets/images",
-                       Ftp::Ascii).getMessage();
-      _client.disconnect().getMessage();
-    }
-  }
-  else
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("La connexion au serveur est impossible ! Vous pouvez quand même\njouer au jeu mais votre score ne sera pas enregistré.\nFermez cette fenêtre pour accéder au launcher.");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased&&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
   // Récupérer les données concernant les sprites des monstres
   unsigned int _monsterNarwhals = 8;
   int _monsterSect[9] = {1,1,2,3,4,5,6,7,8};
   _sb_amont.open("assets/images/hanouna.txt");
   if (!_sb_amont)
   {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger les informations de monstres");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased&&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
+    N::WindowsAssert(false, "Impossible de charger les informations de monstres");
   }
   else
   {
@@ -630,61 +229,7 @@ int main()
     _sb_amont.close();
   }
   // Charger l'image
-  if (!_monsterImg.loadFromFile("assets/images/hanouna.png"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger les têtes de monstre");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased&&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_monsterImg.loadFromFile("assets/images/hanouna.png"), "Impossible de charger les têtes de monstre");
   _monsterImg.createMaskFromColor(Color(000,255,000));
   // Charger la texture
   _monsterText.loadFromImage(_monsterImg);
@@ -705,61 +250,7 @@ int main()
   Image _epolarImg;
   Texture _epolarText;
   // Chargement de l'image
-  if (!_epolarImg.loadFromFile("assets/images/epolar.png"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger le sprite d'Epolar");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased &&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased && _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_epolarImg.loadFromFile("assets/images/epolar.png"), "Impossible de charger le sprite d'Epolar.");
   _epolarImg.createMaskFromColor(Color(000,255,000));
   // Chargement de la texture
   _epolarText.loadFromImage(_epolarImg);
@@ -770,9 +261,7 @@ int main()
   bool _epolarFacedToEnd = true; // Was the epolar facing to the end ?
   bool _epolarIsFlying = true;
   // L'animation
-  int _epolarSect[11] = {0, 262, 524, 786, 1048, 1310, 1572, 1834, 2096,
-                         2358, 2620
-                        }; // Limit pixels between each dragon
+  int _epolarSect[11] = {0, 262, 524, 786, 1048, 1310, 1572, 1834, 2096, 2358, 2620}; // Limit pixels between each dragon
   int _epolarActualSect(1); // 1 -> 10 (different dragon sprite sections)
   float _epolarSpeed(EPOLAR_INIT_SPEED);
   // Décompte et temps
@@ -798,61 +287,7 @@ int main()
   Sprite *_epolarHealthBar[MAX_EPOLAR] = {0};
   Image _epolarHealthBarImg;
   Texture _epolarHealthBarText;
-  if (!_epolarHealthBarImg.loadFromFile("assets/images/epolar_health_bar.png"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger la jauge de vie d'Epolar");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased&&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_epolarHealthBarImg.loadFromFile("assets/images/epolar_health_bar.png"), "Impossible de charger la jauge de vie d'Epolar");
   _epolarHealthBarImg.createMaskFromColor(Color(000,255,000));
   _epolarHealthBarText.loadFromImage(_epolarHealthBarImg);
   _epolarHealthBarText.setSmooth(true);
@@ -873,16 +308,14 @@ int main()
   _gameOver.setCharacterSize(132);
   _gameOver.setFillColor(Color::Red);
   _gameOver.setString("GAME OVER");
-  _gameOver.move((WIN_WIDTH - _gameOver.getLocalBounds().width) /2.00f,
-                 (WIN_HEIGHT- _gameOver.getLocalBounds().height)/2.88f);
+  _gameOver.move((WIN_WIDTH - _gameOver.getLocalBounds().width)  / 2.f,
+                 (WIN_HEIGHT- _gameOver.getLocalBounds().height) / 2.88f);
   _gameOverSubtitle.setFont(_basicFont);
   _gameOverSubtitle.setCharacterSize(40);
   _gameOverSubtitle.setFillColor(Color(200,200,200));
   _gameOverSubtitle.setString("Appuyez sur [Échap]");
-  _gameOverSubtitle.move((WIN_WIDTH -
-                          _gameOverSubtitle.getLocalBounds().width) /2.00f,
-                         _gameOver.getPosition().y +
-                         _gameOver.getLocalBounds().height + 200.0f);
+  _gameOverSubtitle.move((WIN_WIDTH - _gameOverSubtitle.getLocalBounds().width) / 2.f,
+                          _gameOver.getPosition().y + _gameOver.getLocalBounds().height + 200.f);
   /// Credits (en haut à droite)
   string _creditsTexte = "Programmé par HarryBreak";
   Text _credits;
@@ -917,77 +350,13 @@ int main()
   _sb.move(64,64);
   /// Music Manager
   Music _music;
+  N::WindowsAssert(_music.openFromFile("assets/audio/default.ogg"), "Impossible de charger la musique par défaut du jeu!");
   float _music_volume = 45.0f;
-  vector<string> _music_list = browseMusic();
-  if (_music_list.size() == 0)
-  {
-    _music.openFromFile("assets/audio/default.ogg");
-  }
-  else
-  {
-    _music.openFromFile("assets/audio/musiques/"+_music_list[0]);
-  }
   _music.setVolume(_music_volume);
   _music.setLoop(true);
-  bool _music_repeatfolder(false);
-  bool _music_randomfolder(false);
   /// Sound/Noise Manager
   SoundBuffer _firehorn_buffer;
-  if (!_firehorn_buffer.loadFromFile("assets/audio/launch.ogg"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger les fichiers de son");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased &&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased && _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_firehorn_buffer.loadFromFile("assets/audio/launch.ogg"), "Impossible de charger le son du tir!");
   Sound *_firehorn[MAX_SOUNDS] = {0};
   float _firehorn_volume = 30.0f;
   /// Parameters File
@@ -1039,61 +408,7 @@ int main()
   Image _menuBarreImg;
   Texture _menuBarreText;
   // Loading...
-  if (!_menuBarreImg.loadFromFile("assets/images/barre_menu.png"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger les sprites de menu");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased &&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased && _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
+  N::WindowsAssert(_menuBarreImg.loadFromFile("assets/images/barre_menu.png"), "Impossible de charger les sprites de menu");
   _menuBarreImg.createMaskFromColor(Color(000,255,000));
   _menuBarreText.loadFromImage(_menuBarreImg);
   _menuBarreText.setSmooth(true);
@@ -1121,183 +436,40 @@ int main()
                                      *_menuJaugeRect[i]);
     _menuTxtJauge[i] = new Text("", _basicFont, 32);
   }
-  // Listes
-  Image _listeImg;
-  Texture _listeText;
-  if (!_listeImg.loadFromFile("assets/images/liste_menu.png"))
-  {
-    _windowError.create(VideoMode(858,570), "Narwhal Bug");
-    _errorText.setString("Impossible de charger les sprites de liste");
-    _windowError.requestFocus();
-    while (_windowError.isOpen())
-    {
-      // Key binding
-      if (_windowError.pollEvent(_event))
-      {
-        if (_event.type == Event::Closed)
-        {
-          _windowError.close();
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased &&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased && _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
-      }
-      // Key activate
-      if (_key[Keyboard::Escape] && !_keypressed[Keyboard::Escape])
-      {
-        _windowError.close();
-        _keypressed[Keyboard::Escape] = true;
-      }
-      _windowError.clear();
-      _windowError.draw(_errorBgd);
-      _windowError.draw(_error);
-      _windowError.draw(_errorText);
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-      _windowError.draw(_cursor);
-      _windowError.display();
-    }
-  }
-  _listeImg.createMaskFromColor(Color(000,255,000));
-  _listeText.loadFromImage(_listeImg);
-  _listeText.setSmooth(true);
-  unsigned int _listeContenance = 3;
-  unsigned int *_listeCurseur[NBR_LISTES] = {0};
-  unsigned int *_listeSelected[NBR_LISTES] = {0};
-  Text *_listeNomTxt[NBR_LISTES] = {0};
-  IntRect *_listeRect[NBR_LISTES] = {0};
-  Sprite *_listeFlecheHaut[NBR_LISTES] = {0};
-  Sprite *_listeFlecheBas[NBR_LISTES] = {0};
-  Sprite *_listeNom[NBR_LISTES] = {0};
-  vector<string> _listeChoixStr[NBR_LISTES] = {vector<string>(0)};
-  Text *_listeChoixTxt0[NBR_LISTES] = {0};
-  Text *_listeChoixTxt1[NBR_LISTES] = {0};
-  Text *_listeChoixTxt2[NBR_LISTES] = {0};
-  Sprite *_listeChoix0[NBR_LISTES] = {0};
-  Sprite *_listeChoix1[NBR_LISTES] = {0};
-  Sprite *_listeChoix2[NBR_LISTES] = {0};
-  for (unsigned int i = 0 ; i < NBR_LISTES ; i++)
-  {
-    _listeRect[i] = new IntRect(0, 0, 76, 76);
-    _listeFlecheHaut[i] = new Sprite(_listeText, *_listeRect[i]);
-    *_listeRect[i] = {0, 76, 729, 76};
-    _listeChoix0[i] = new Sprite(_listeText, *_listeRect[i]);
-    _listeChoix1[i] = new Sprite(_listeText, *_listeRect[i]);
-    _listeChoix2[i] = new Sprite(_listeText, *_listeRect[i]);
-    *_listeRect[i] = {76, 0, 577, 76};
-    _listeNom[i] = new Sprite(_listeText, *_listeRect[i]);
-    *_listeRect[i] = {577+76, 0, 76, 76};
-    _listeFlecheBas[i] = new Sprite(_listeText, *_listeRect[i]);
-    _listeChoixTxt0[i] = new Text("", _basicFont, 28);
-    _listeChoixTxt1[i] = new Text("", _basicFont, 28);
-    _listeChoixTxt2[i] = new Text("", _basicFont, 28);
-    _listeNomTxt[i] = new Text("Liste sans nom", _policeFont, 48);
-    _listeCurseur[i] = new unsigned int(0);
-    _listeSelected[i] = new unsigned int(0);
-  }
   // Jauges
   _menuJaugeFond[JAUGE_SON]->setPosition(
-    (WIN_WIDTH-_menuJaugeFond[JAUGE_SON]->getLocalBounds().width)/2,
-    (WIN_HEIGHT-_menuJaugeFond[JAUGE_SON]->getLocalBounds().height)/4);
-  _menuJaugeCursor[JAUGE_SON]->setPosition(_menuJaugeFond[JAUGE_SON]->getPosition().x + _firehorn_volume*(729.0f - _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width)/100.0f, _menuJaugeFond[JAUGE_SON]->getPosition().y);
-  _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+intToString(static_cast<int>(_firehorn_volume))+" %");
-  _menuTxtJauge[JAUGE_SON]->setPosition(_menuJaugeFond[JAUGE_SON]->getPosition().x + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().width - _menuTxtJauge[JAUGE_SON]->getLocalBounds().width )/2, _menuJaugeFond[JAUGE_SON]->getPosition().y + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().height-_menuTxtJauge[JAUGE_SON]->getLocalBounds().height)/4);
+    (WIN_WIDTH -_menuJaugeFond[JAUGE_SON]->getLocalBounds().width) / 2,
+    (WIN_HEIGHT-_menuJaugeFond[JAUGE_SON]->getLocalBounds().height)/ 4);
+  _menuJaugeCursor[JAUGE_SON]->setPosition(
+    _menuJaugeFond[JAUGE_SON]->getPosition().x + _firehorn_volume * (729.f - _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width) / 100.f,
+    _menuJaugeFond[JAUGE_SON]->getPosition().y);
+  _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+N::intToString(static_cast<int>(_firehorn_volume))+" %");
+  _menuTxtJauge[JAUGE_SON]->setPosition(
+    _menuJaugeFond[JAUGE_SON]->getPosition().x + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().width - _menuTxtJauge[JAUGE_SON]->getLocalBounds().width) / 2,
+    _menuJaugeFond[JAUGE_SON]->getPosition().y + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().height-_menuTxtJauge[JAUGE_SON]->getLocalBounds().height) / 4);
+
   _menuJaugeFond[JAUGE_MUSIQUE]->setPosition(
-    (WIN_WIDTH-_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width)/2,
+    (WIN_WIDTH-_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width) / 2,
     _menuJaugeFond[JAUGE_SON]->getPosition().y -_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height - 15);
   _menuJaugeCursor[JAUGE_MUSIQUE]->setPosition(
-    _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + _music_volume*(729.0f - _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width)/100.0f,
+    _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + _music_volume*(729.f - _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width) / 100.f,
     _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y);
-  _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique :"+intToString(static_cast<int>(_music_volume))+" %");
-  _menuTxtJauge[JAUGE_MUSIQUE]->setPosition(_menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width - _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().width )/2,
-      _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y +
-      (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height-
-       _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().height)/4);
-  // Listes (quand le curseur du joueur se trouve sur un bouton, changer la couleur du sprite entier)
-  _listeNom[LISTE_MUSIQUES]->setPosition((WIN_WIDTH -
-                                          _listeNom[LISTE_MUSIQUES]->getLocalBounds().width)/2,
-                                         _menuJaugeFond[JAUGE_SON]->getPosition().y +
-                                         _menuJaugeFond[JAUGE_SON]->getLocalBounds().height + 15);
-  _listeNomTxt[LISTE_MUSIQUES]->setString("Liste des musiques");
-  _listeNomTxt[LISTE_MUSIQUES]->setPosition(_listeNom[LISTE_MUSIQUES]->getPosition().x + (_listeNom[LISTE_MUSIQUES]->getLocalBounds().width -
-      _listeNomTxt[LISTE_MUSIQUES]->getLocalBounds().width )/2,
-      _listeNom[LISTE_MUSIQUES]->getPosition().y -
-      (_listeNom[LISTE_MUSIQUES]->getLocalBounds().height-
-       _listeNomTxt[LISTE_MUSIQUES]->getLocalBounds().height)/8);
-  _listeFlecheBas[LISTE_MUSIQUES]->setPosition(_listeNom[LISTE_MUSIQUES]->getPosition().x - _listeFlecheBas[LISTE_MUSIQUES]->getLocalBounds().width,
-      _listeNom[LISTE_MUSIQUES]->getPosition().y);
-  _listeFlecheHaut[LISTE_MUSIQUES]->setPosition(_listeNom[LISTE_MUSIQUES]->getPosition().x +_listeNom[LISTE_MUSIQUES]->getLocalBounds().width,
-      _listeNom[LISTE_MUSIQUES]->getPosition().y);
-  _listeChoix0[LISTE_MUSIQUES]->setPosition(_listeFlecheBas[LISTE_MUSIQUES]->getPosition().x,
-      _listeFlecheBas[LISTE_MUSIQUES]->getPosition().y + 76*1);
-  _listeChoix1[LISTE_MUSIQUES]->setPosition(_listeFlecheBas[LISTE_MUSIQUES]->getPosition().x,
-      _listeFlecheBas[LISTE_MUSIQUES]->getPosition().y + 76*2);
-  _listeChoix2[LISTE_MUSIQUES]->setPosition(_listeFlecheBas[LISTE_MUSIQUES]->getPosition().x,
-      _listeFlecheBas[LISTE_MUSIQUES]->getPosition().y + 76*3);
-  _listeChoixTxt0[LISTE_MUSIQUES]->setPosition(_listeChoix0[LISTE_MUSIQUES]->getPosition().x + 10,
-      _listeChoix0[LISTE_MUSIQUES]->getPosition().y +
-      (_listeChoix0[LISTE_MUSIQUES]->getLocalBounds().height-
-       _listeChoixTxt0[LISTE_MUSIQUES]->getLocalBounds().height)/4);
-  _listeChoixTxt1[LISTE_MUSIQUES]->setPosition(_listeChoix1[LISTE_MUSIQUES]->getPosition().x + 10,
-      _listeChoix1[LISTE_MUSIQUES]->getPosition().y +
-      (_listeChoix1[LISTE_MUSIQUES]->getLocalBounds().height-
-       _listeChoixTxt1[LISTE_MUSIQUES]->getLocalBounds().height)/4);
-  _listeChoixTxt2[LISTE_MUSIQUES]->setPosition(_listeChoix2[LISTE_MUSIQUES]->getPosition().x + 10,
-      _listeChoix2[LISTE_MUSIQUES]->getPosition().y +
-      (_listeChoix2[LISTE_MUSIQUES]->getLocalBounds().height-
-       _listeChoixTxt2[LISTE_MUSIQUES]->getLocalBounds().height)/4);
-  _listeChoixStr[LISTE_MUSIQUES] = _music_list;
-  for (unsigned int i = 0 ; i < _listeChoixStr[LISTE_MUSIQUES].size() ;
-       i++)
-  {
-    _listeChoixStr[LISTE_MUSIQUES][i] =
-      _listeChoixStr[LISTE_MUSIQUES][i].substr(0, 47);
-  }
+  _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique :"+N::intToString(static_cast<int>(_music_volume))+" %");
+  _menuTxtJauge[JAUGE_MUSIQUE]->setPosition(
+    _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width - _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().width ) / 2,
+    _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height- _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().height) / 4);
+
   // Boutons
-  _menuBarre[BUT_MUSIC_REPEAT]->setPosition((WIN_WIDTH -
-      _menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width) /2.00f,
-      _listeChoix2[LISTE_MUSIQUES]->getPosition().y +
-      _listeChoix2[LISTE_MUSIQUES]->getLocalBounds().height + 15.0f);
-  _menuTxtBarre[BUT_MUSIC_REPEAT]->setString("Répétition : musique sélectionnée");
-  _menuTxtBarre[BUT_MUSIC_REPEAT]->setPosition(_menuBarre[BUT_MUSIC_REPEAT]->getPosition().x + (_menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width -
-      _menuTxtBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width )/2,
-      _menuBarre[BUT_MUSIC_REPEAT]->getPosition().y +
-      (_menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().height-
-       _menuTxtBarre[BUT_MUSIC_REPEAT]->getLocalBounds().height)/4);
-  _menuBarre[BUT_MUSIQUE]->setPosition((WIN_WIDTH
-                                        -_menuBarre[BUT_MUSIQUE]->getLocalBounds().width) /2,
-                                       (WIN_HEIGHT-_menuBarre[BUT_MUSIQUE]->getLocalBounds().height)/2);
+  _menuBarre[BUT_MUSIQUE]->setPosition(
+    (WIN_WIDTH -_menuBarre[BUT_MUSIQUE]->getLocalBounds().width) / 2,
+    (WIN_HEIGHT-_menuBarre[BUT_MUSIQUE]->getLocalBounds().height)/ 2);
   _menuTxtBarre[BUT_MUSIQUE]->setString("Sons et musique");
-  _menuTxtBarre[BUT_MUSIQUE]->setPosition(_menuBarre[BUT_MUSIQUE]->getPosition().x + (_menuBarre[BUT_MUSIQUE]->getLocalBounds().width -
-                                          _menuTxtBarre[BUT_MUSIQUE]->getLocalBounds().width )/2,
-                                          _menuBarre[BUT_MUSIQUE]->getPosition().y +
-                                          (_menuBarre[BUT_MUSIQUE]->getLocalBounds().height-
-                                              _menuTxtBarre[BUT_MUSIQUE]->getLocalBounds().height)/4);
-  _menuBarre[BUT_RETOUR_JEU]->setPosition((WIN_WIDTH
-                                          -_menuBarre[BUT_RETOUR_JEU]->getLocalBounds().width) /2,
-                                          _menuBarre[BUT_MUSIQUE]->getPosition().y -
-                                          _menuBarre[BUT_RETOUR_JEU]->getLocalBounds().height - 15);
+  _menuTxtBarre[BUT_MUSIQUE]->setPosition(
+    _menuBarre[BUT_MUSIQUE]->getPosition().x + (_menuBarre[BUT_MUSIQUE]->getLocalBounds().width - _menuTxtBarre[BUT_MUSIQUE]->getLocalBounds().width ) / 2,
+    _menuBarre[BUT_MUSIQUE]->getPosition().y + (_menuBarre[BUT_MUSIQUE]->getLocalBounds().height- _menuTxtBarre[BUT_MUSIQUE]->getLocalBounds().height) / 4);
+  _menuBarre[BUT_RETOUR_JEU]->setPosition(
+    (WIN_WIDTH -_menuBarre[BUT_RETOUR_JEU]->getLocalBounds().width) / 2,
+    _menuBarre[BUT_MUSIQUE]->getPosition().y - _menuBarre[BUT_RETOUR_JEU]->getLocalBounds().height - 15);
   _menuTxtBarre[BUT_RETOUR_JEU]->setString("Retour au jeu");
   _menuTxtBarre[BUT_RETOUR_JEU]->setPosition(_menuBarre[BUT_RETOUR_JEU]->getPosition().x + (_menuBarre[BUT_RETOUR_JEU]->getLocalBounds().width -
       _menuTxtBarre[BUT_RETOUR_JEU]->getLocalBounds().width )/2,
@@ -1326,7 +498,7 @@ int main()
   _menuBarre[BUT_KEY_FORWARD]->setPosition((WIN_WIDTH
       -_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().width) /2,
       (WIN_HEIGHT-_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().height)/2 - 40);
-  _menuTxtBarre[BUT_KEY_FORWARD]->setString("Go right : "+keystring(_keyid[KEYB_FORWARD]));
+  _menuTxtBarre[BUT_KEY_FORWARD]->setString("Go right : "+N::keystring(_keyid[KEYB_FORWARD]));
   _menuTxtBarre[BUT_KEY_FORWARD]->setPosition(_menuBarre[BUT_KEY_FORWARD]->getPosition().x + (_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_FORWARD]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_FORWARD]->getPosition().y +
@@ -1336,7 +508,7 @@ int main()
                                           -_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().width) /2,
                                           _menuBarre[BUT_KEY_FORWARD]->getPosition().y -
                                           _menuBarre[BUT_KEY_GODOWN]->getLocalBounds().height - 15);
-  _menuTxtBarre[BUT_KEY_GODOWN]->setString("Go down : "+keystring(_keyid[KEYB_GODOWN]));
+  _menuTxtBarre[BUT_KEY_GODOWN]->setString("Go down : "+N::keystring(_keyid[KEYB_GODOWN]));
   _menuTxtBarre[BUT_KEY_GODOWN]->setPosition(_menuBarre[BUT_KEY_GODOWN]->getPosition().x + (_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_GODOWN]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_GODOWN]->getPosition().y +
@@ -1346,7 +518,7 @@ int main()
                                          -_menuBarre[BUT_KEY_GOUP]->getLocalBounds().width) /2,
                                         _menuBarre[BUT_KEY_GODOWN]->getPosition().y -
                                         _menuBarre[BUT_KEY_GOUP]->getLocalBounds().height - 15);
-  _menuTxtBarre[BUT_KEY_GOUP]->setString("Go up : "+keystring(_keyid[KEYB_GOUP]));
+  _menuTxtBarre[BUT_KEY_GOUP]->setString("Go up : "+N::keystring(_keyid[KEYB_GOUP]));
   _menuTxtBarre[BUT_KEY_GOUP]->setPosition(_menuBarre[BUT_KEY_GOUP]->getPosition().x + (_menuBarre[BUT_KEY_GOUP]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_GOUP]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_GOUP]->getPosition().y +
@@ -1356,7 +528,7 @@ int main()
       -_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().width) /2,
       _menuBarre[BUT_KEY_GOUP]->getPosition().y -
       _menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().height - 15);
-  _menuTxtBarre[BUT_KEY_BACKWARD]->setString("Go left : "+keystring(_keyid[KEYB_BACKWARD]));
+  _menuTxtBarre[BUT_KEY_BACKWARD]->setString("Go left : "+N::keystring(_keyid[KEYB_BACKWARD]));
   _menuTxtBarre[BUT_KEY_BACKWARD]->setPosition(_menuBarre[BUT_KEY_BACKWARD]->getPosition().x + (_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_BACKWARD]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_BACKWARD]->getPosition().y +
@@ -1366,7 +538,7 @@ int main()
       -_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width) /2,
       _menuBarre[BUT_KEY_FORWARD]->getPosition().y +
       _menuBarre[BUT_KEY_FORWARD]->getLocalBounds().height + 15);
-  _menuTxtBarre[BUT_KEY_ACCERELATE]->setString("Accelerate : "+keystring(_keyid[KEYB_ACCELERATE]));
+  _menuTxtBarre[BUT_KEY_ACCERELATE]->setString("Accelerate : "+N::keystring(_keyid[KEYB_ACCELERATE]));
   _menuTxtBarre[BUT_KEY_ACCERELATE]->setPosition(_menuBarre[BUT_KEY_ACCERELATE]->getPosition().x +
       (_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width -
        _menuTxtBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width )/2,
@@ -1377,7 +549,7 @@ int main()
       -_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().width) /2,
       _menuBarre[BUT_KEY_ACCERELATE]->getPosition().y +
       _menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().height + 15);
-  _menuTxtBarre[BUT_KEY_FIREBALL]->setString("Fire : "+keystring(_keyid[KEYB_FIREBALL]));
+  _menuTxtBarre[BUT_KEY_FIREBALL]->setString("Fire : "+N::keystring(_keyid[KEYB_FIREBALL]));
   _menuTxtBarre[BUT_KEY_FIREBALL]->setPosition(_menuBarre[BUT_KEY_FIREBALL]->getPosition().x + (_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_FIREBALL]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_FIREBALL]->getPosition().y +
@@ -1387,7 +559,7 @@ int main()
       -_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().width) /2,
       _menuBarre[BUT_KEY_FIREBALL]->getPosition().y +
       _menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().height + 15);
-  _menuTxtBarre[BUT_KEY_FPSDISP]->setString("Afficher les FPS : "+keystring(_keyid[KEYB_FIREBALL]));
+  _menuTxtBarre[BUT_KEY_FPSDISP]->setString("Afficher les FPS : "+N::keystring(_keyid[KEYB_FIREBALL]));
   _menuTxtBarre[BUT_KEY_FPSDISP]->setPosition(_menuBarre[BUT_KEY_FPSDISP]->getPosition().x + (_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().width -
       _menuTxtBarre[BUT_KEY_FPSDISP]->getLocalBounds().width )/2,
       _menuBarre[BUT_KEY_FPSDISP]->getPosition().y +
@@ -1407,12 +579,10 @@ int main()
   Image _jouerBoutonImg;
   Texture _jouerBoutonTxt;
   Sprite _jouerBouton;
-  _jouerBoutonImg.loadFromFile("assets/images/play_button.bmp");
+  N::WindowsAssert(_jouerBoutonImg.loadFromFile("assets/images/play_button.bmp"), "Impossible de charger le sprite du bouton Jouer");
   _jouerBoutonTxt.loadFromImage(_jouerBoutonImg);
   _jouerBouton.setTexture(_jouerBoutonTxt, true);
-  _jouerBouton.setPosition((WIN_W - _jouerBouton.getLocalBounds().width)
-                           /2.00f, (WIN_H -
-                                    _jouerBouton.getLocalBounds().height)/1.22f);
+  _jouerBouton.setPosition((WIN_W - _jouerBouton.getLocalBounds().width) / 2.f, (WIN_H - _jouerBouton.getLocalBounds().height) / 1.22f);
   /// Loading finished
   while (_windowLauncher.isOpen())
   {
@@ -1420,53 +590,22 @@ int main()
     {
       _chrono.restart();
       // Key binding
-      if (_windowLauncher.pollEvent(_event))
+      N::EventManager::GetInstance()->bind(&_windowLauncher);
+      if (N::EventManager::GetInstance()->isCloseTriggered())
       {
-        if (_event.type == Event::Closed)
-        {
-          _windowLauncher.close();
-          _playerIsInLauncher = false;
-        }
-        for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-        {
-          if (_event.type == Event::KeyPressed &&
-              _event.key.code == i)
-          {
-            _key[i] = true;
-          }
-          if (_event.type == Event::KeyReleased&&
-              _event.key.code == i)
-          {
-            _key[i] = false;
-            _keypressed[i] = false;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonPressed && _event.mouseButton.button == i)
-          {
-            _button[i] = true;
-          }
-          if (i < Mouse::ButtonCount && _event.type ==
-              Event::MouseButtonReleased&& _event.mouseButton.button == i)
-          {
-            _button[i] = false;
-            _buttonpressed[i] = false;
-          }
-        }
+        _windowLauncher.close();
+        _playerIsInLauncher = false;
       }
       // Key activation
       if (_formulaireActivated)
       {
-        if (_key[Keyboard::Escape] &&
-            !_keypressed[Keyboard::Escape])
+        if (N::EventManager::GetInstance()->isButtonPressed(Keyboard::Escape, true))
         {
           _formulaireActivated = false;
-          _keypressed[Keyboard::Escape] = true;
         }
-        else if (_event.type == Event::TextEntered &&
-                 !_textEntered)
+        else if (N::EventManager::GetInstance()->isTextEntered(true))
         {
-          _textEntered = true;
-          switch (_event.text.unicode)
+          switch (N::EventManager::GetInstance()->lastUnicode())
           {
             // Backspace
             case 8:
@@ -1475,66 +614,10 @@ int main()
               break;
             case 13:
               // If player didn't enter any pseudo
-              _keypressed[Keyboard::Return] = true;
+              N::EventManager::GetInstance()->isButtonPressed(Keyboard::Return, true);
               if (_formulaireStr.size() == 0)
               {
-                _errorText.setString("Impossible de jouer sans entrer son pseudonyme !");
-                _windowError.create(VideoMode(858,570), "Narwhal Bug");
-                _windowError.requestFocus();
-                while (_windowError.isOpen())
-                {
-                  // Key binding
-                  if (_windowError.pollEvent(_event))
-                  {
-                    if (_event.type == Event::Closed)
-                    {
-                      _windowError.close();
-                    }
-                    for (int i = 0 ; i <
-                         Keyboard::KeyCount ; ++i) // Keyboard
-                    {
-                      if (_event.type ==
-                          Event::KeyPressed && _event.key.code == i)
-                      {
-                        _key[i] = true;
-                      }
-                      if (_event.type ==
-                          Event::KeyReleased&& _event.key.code == i)
-                      {
-                        _key[i] = false;
-                        _keypressed[i] = false;
-                      }
-                      if (i < Mouse::ButtonCount &&
-                          _event.type == Event::MouseButtonPressed && _event.mouseButton.button ==
-                          i)
-                      {
-                        _button[i] = true;
-                      }
-                      if (i < Mouse::ButtonCount &&
-                          _event.type == Event::MouseButtonReleased && _event.mouseButton.button ==
-                          i)
-                      {
-                        _button[i] = false;
-                        _buttonpressed[i] = false;
-                      }
-                    }
-                  }
-                  // Key activate
-                  if (_key[Keyboard::Escape] &&
-                      !_keypressed[Keyboard::Escape])
-                  {
-                    _windowError.close();
-                    _keypressed[Keyboard::Escape] =
-                      true;
-                  }
-                  _windowError.clear();
-                  _windowError.draw(_errorBgd);
-                  _windowError.draw(_error);
-                  _windowError.draw(_errorText);
-                  _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-                  _windowError.draw(_cursor);
-                  _windowError.display();
-                }
+                N::WindowsAssert(false, "Impossible de jouer sans entrer son pseudonyme !");
               }
               else
               {
@@ -1544,87 +627,31 @@ int main()
               }
               break;
             default:
-              if (_formulaireVecchar.size() <
-                  PSEUDO_MAXSIZE)
-                _formulaireVecchar.push_back(static_cast<char>(_event.text.unicode));
+              if (_formulaireVecchar.size() < PSEUDO_MAXSIZE)
+              {
+                _formulaireVecchar.push_back(static_cast<char>(N::EventManager::GetInstance()->lastUnicode()));
+              }
               break;
           }
-          _formulaireStr = charListToString(_formulaireVecchar);
+          _formulaireStr = N::charListToString(_formulaireVecchar);
           _formulaireText.setString(_formulaireStr);
         }
-        else if (_event.type != Event::TextEntered)
+        else if (!N::EventManager::GetInstance()->isTextEntered())
         {
           _textEntered = false;
         }
       }
       // Mouse activation
       // Play Button
-      if (contact(_cursor.getPosition(), _cursor.getLocalBounds(),
-                  _jouerBouton.getPosition(), _jouerBouton.getLocalBounds()))
+      if (N::Cursor::GetInstance()->point(_jouerBouton))
       {
         _jouerBouton.setColor(Color(255,166,166,244));
-        if (_button[Mouse::Left] && !_buttonpressed[Mouse::Left])
+        if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, false))
         {
-          _buttonpressed[Mouse::Left] = true;
           // If player didn't enter any pseudo
           if (_formulaireStr.size() == 0)
           {
-            _errorText.setString("Impossible de jouer sans entrer son pseudonyme !");
-            _windowError.create(VideoMode(858,570), "Narwhal Bug");
-            _windowError.requestFocus();
-            while (_windowError.isOpen())
-            {
-              // Key binding
-              if (_windowError.pollEvent(_event))
-              {
-                if (_event.type == Event::Closed)
-                {
-                  _windowError.close();
-                }
-                for (int i = 0 ; i < Keyboard::KeyCount ;
-                     ++i) // Keyboard
-                {
-                  if (_event.type == Event::KeyPressed
-                      && _event.key.code == i)
-                  {
-                    _key[i] = true;
-                  }
-                  if (_event.type ==
-                      Event::KeyReleased&& _event.key.code == i)
-                  {
-                    _key[i] = false;
-                    _keypressed[i] = false;
-                  }
-                  if (i < Mouse::ButtonCount &&
-                      _event.type == Event::MouseButtonPressed && _event.mouseButton.button ==
-                      i)
-                  {
-                    _button[i] = true;
-                  }
-                  if (i < Mouse::ButtonCount &&
-                      _event.type == Event::MouseButtonReleased&& _event.mouseButton.button ==
-                      i)
-                  {
-                    _button[i] = false;
-                    _buttonpressed[i] = false;
-                  }
-                }
-              }
-              // Key activate
-              if (_key[Keyboard::Escape] &&
-                  !_keypressed[Keyboard::Escape])
-              {
-                _windowError.close();
-                _keypressed[Keyboard::Escape] = true;
-              }
-              _windowError.clear();
-              _windowError.draw(_errorBgd);
-              _windowError.draw(_error);
-              _windowError.draw(_errorText);
-              _cursor.setPosition((Vector2f)Mouse::getPosition(_windowError));
-              _windowError.draw(_cursor);
-              _windowError.display();
-            }
+            N::WindowsAssert(false, "Impossible de jouer sans entrer son pseudonyme !");
           }
           else
           {
@@ -1639,22 +666,17 @@ int main()
         _jouerBouton.setColor(Color(255,255,255,255));
       }
       // Form
-      if (contact(_cursor.getPosition(), _cursor.getLocalBounds(),
-                  _formulaire.getPosition(), _formulaire.getLocalBounds()))
+      if (N::Cursor::GetInstance()->point(_formulaire, true))
       {
-        _cursor.setTextureRect(CURSOR_ONTEXT);
-        if (_button[Mouse::Left] && !_buttonpressed[Mouse::Left])
+        if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, false))
         {
-          _buttonpressed[Mouse::Left] = true;
           _formulaireActivated = true;
         }
       }
       else
       {
-        _cursor.setTextureRect(CURSOR_NORMAL);
-        if (_button[Mouse::Left] && !_buttonpressed[Mouse::Left])
+        if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, false))
         {
-          _buttonpressed[Mouse::Left] = true;
           _formulaireActivated = false;
         }
       }
@@ -1672,8 +694,7 @@ int main()
       _windowLauncher.draw(_jouerBouton);
       _windowLauncher.draw(_formulaireText);
       // Cursor always last !
-      _cursor.setPosition((Vector2f)Mouse::getPosition(_windowLauncher));
-      _windowLauncher.draw(_cursor);
+      N::Cursor::GetInstance()->drawOnWindow(&_windowLauncher);
       /// Monitoring
       // Control FPS
       sf::sleep(milliseconds(_t_fps - _chrono.getElapsedTime().asMilliseconds()));
@@ -1689,10 +710,9 @@ int main()
   /// Strecth pseudonyme
   string _pseudo = _formulaireStr;
   _socket.disconnect();
-  _cursor.setTextureRect(CURSOR_NORMAL);
+  N::Cursor::GetInstance()->reset();
   RenderWindow _window;
-  if (!(!_playerIsInGame && !_playerIsInLauncher && !_playerIsInMenu &&
-        !_playerIsInOption))
+  if (!(!_playerIsInGame && !_playerIsInLauncher && !_playerIsInMenu && !_playerIsInOption))
   {
     /// Rendering Window
     // Création de la fenêtre
@@ -1805,76 +825,50 @@ int main()
         /// ALWAYS REFRESH START TIME BEFORE ENTERING ANY MENU
         _chrono.restart();
         /// Event Managing InGame
-        // Event Binding
-        if (_window.pollEvent(_event))
+        N::EventManager::GetInstance()->bind(&_window);
+        if (N::EventManager::GetInstance()->isCloseTriggered())
         {
-          if (_event.type == Event::Closed) //Red Cross
-          {
-            _window.close();
-            _playerIsInGame = false;
-          }
-          for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-          {
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code == i)
-            {
-              _key[i] = true;
-            }
-            if (_event.type == Event::KeyReleased &&
-                _event.key.code == i)
-            {
-              _key[i] = false;
-              _keypressed[i] = false;
-            }
-          }
+          _window.close();
+          _playerIsInGame = false;
         }
         // Key Checking
-        if (_key[Keyboard::Escape] &&
-            !_keypressed[Keyboard::Escape]) /// [Escape] -> Quit the game
+        if (N::EventManager::GetInstance()->isKeyPressed(Keyboard::Escape, true)) /// [Escape] -> Quit the game
         {
           _playerIsInGame = false;
           if (_dragonIsAlive)
             _playerIsInOption = true;
           else
             _playerIsInMenu = true;
-          _keypressed[Keyboard::Escape] = true;
         }
-        if (_key[_keyid[KEYB_BACKWARD]] && _dragonIsAlive)
-          /// BACKWARD -> Backward
+        if (_dragonIsAlive && N::EventManager::GetInstance()->isKeyPressed(_keyid[KEYB_BACKWARD])) /// BACKWARD -> Backward
         {
           _dragon.move(-_dragonSpeed,0);
           _dragonFaceToEnd = false;
         }
-        if (_key[_keyid[KEYB_FORWARD]] && _dragonIsAlive)
-          /// FORWARD -> Forward
+        if (_dragonIsAlive && N::EventManager::GetInstance()->isKeyPressed(_keyid[KEYB_FORWARD])) /// FORWARD -> Forward
         {
           _dragon.move(_dragonSpeed,0);
           _dragonFaceToEnd = true;
         }
-        if (_key[_keyid[KEYB_GODOWN]] && _dragonIsAlive)
-          /// GO_DOWN -> Go down
+        if (_dragonIsAlive && N::EventManager::GetInstance()->isKeyPressed(_keyid[KEYB_GODOWN])) /// GO_DOWN -> Go down
         {
           _dragon.move(0,_dragonSpeed);
         }
-        if (_key[_keyid[KEYB_GOUP]] && _dragonIsAlive)
-          /// GO_UP -> Fly up
+        if (_dragonIsAlive && N::EventManager::GetInstance()->isKeyPressed(_keyid[KEYB_GOUP])) /// GO_UP -> Fly up
         {
           _dragon.move(0,-_dragonSpeed);
         }
-        if (_key[_keyid[KEYB_ACCELERATE]])
-          /// Hold ACCELERATE -> Speed up
+        if (N::EventManager::GetInstance()->isKeyPressed(_keyid[KEYB_ACCELERATE])) /// Hold ACCELERATE -> Speed up
         {
           _dragonSpeed = 20.0f;
           _dragonAnimSpeed = HIGH_SPEED_ANIM;
         }
-        if (!_key[_keyid[KEYB_ACCELERATE]])
-          /// Release ACCELERATE -> Slow down
+        else /// Release ACCELERATE -> Slow down
         {
           _dragonSpeed = 7.0f;
           _dragonAnimSpeed = NORMAL_SPEED_ANIM;
         }
-        if (_key[_keyid[KEYB_FIREBALL]] && _dragonIsAlive)
-          /// FIREBALL -> Throw ONE Fireball
+        if (_dragonIsAlive && N::EventManager::GetInstance()->isKeyPressed(_keyid[KEYB_FIREBALL], true)) /// FIREBALL -> Throw ONE Fireball
         {
           for (unsigned int i = 0 ; i < MAX_SOUNDS ; ++i)
           {
@@ -1892,30 +886,29 @@ int main()
             {
               if (!_dragonFireballPowered)
               {
-                _fireball[i] = (_dragonFaceToEnd) ? new
-                               Sprite(_fireballText, _fireballSect[0]) : new
-                               Sprite(_fireballText, _fireballSect[1]);
+                _fireball[i] = (_dragonFaceToEnd)
+                  ? new Sprite(_fireballText, _fireballSect[0])
+                  : new Sprite(_fireballText, _fireballSect[1]);
                 if (_dragonFaceToEnd)
-                  _fireball[i]->move(_dragon.getPosition().x + 150,
-                                     _dragon.getPosition().y);
+                  _fireball[i]->move(
+                    _dragon.getPosition().x + 150,
+                    _dragon.getPosition().y);
                 else
-                  _fireball[i]->move(_dragon.getPosition().x, _dragon.getPosition().y);
+                  _fireball[i]->move(
+                    _dragon.getPosition().x,
+                    _dragon.getPosition().y);
                 _fireballThrown = true;
                 break;
               }
               else
               {
-                _fireball[i] = new Sprite(_fireballText,
-                                          _fireballSect[0]);
-                _fireball[i]->move(_dragon.getPosition().x
-                                   + 150, _dragon.getPosition().y);
-                for (unsigned int j = i+1 ; j <
-                     MAX_FIREBALL ; ++j)
+                _fireball[i] = new Sprite(_fireballText, _fireballSect[0]);
+                _fireball[i]->move(_dragon.getPosition().x + 150, _dragon.getPosition().y);
+                for (unsigned int j = i+1 ; j < MAX_FIREBALL ; ++j)
                 {
                   if (_fireball[j] == 0)
                   {
-                    _fireball[j] = new
-                    Sprite(_fireballText, _fireballSect[1]);
+                    _fireball[j] = new Sprite(_fireballText, _fireballSect[1]);
                     _fireball[j]->move(_dragon.getPosition().x, _dragon.getPosition().y);
                     break;
                   }
@@ -1924,21 +917,14 @@ int main()
               }
             }
           }
-          _keypressed[_keyid[KEYB_FIREBALL]] = true;
         }
-        if (!_key[_keyid[KEYB_FIREBALL]])
-          /// Release FIREBALL -> Allow Bluko to throw an another fireball :)
+        if (!N::EventManager::GetInstance()->isKeyPressed(_keyid[KEYB_FIREBALL])) /// Release FIREBALL -> Allow Bluko to throw an another fireball :)
         {
           _fireballThrown = false;
         }
-        if (_key[_keyid[KEYB_FPSDISP]] &&
-            !_keypressed[_keyid[KEYB_FPSDISP]]) /// Press FPS_DISP -> Show/Hide FPS Count
+        if (N::EventManager::GetInstance()->isKeyPressed(_keyid[KEYB_FPSDISP])) /// Press FPS_DISP -> Show/Hide FPS Count
         {
-          if (_showFPS)
-            _showFPS = false;
-          else
-            _showFPS = true;
-          _keypressed[_keyid[KEYB_FPSDISP]] = true;
+          _showFPS = !_showFPS;
         }
         /***************\
         ---> CALCULS <---
@@ -1966,7 +952,7 @@ int main()
         }
         /// Monsters
         // Spawning
-        if (_t_passedInGame >= nextMonsterSpawnDate(_monsterTotal))
+        if (_t_passedInGame >= N::nextMonsterSpawnDate(_monsterTotal))
         {
           for (unsigned int i = 0 ; i < MAX_MONSTER ; ++i)
           {
@@ -2036,7 +1022,7 @@ int main()
             {
               if (_fireball[j] != 0) /// If the fireball exists !
               {
-                if (contact(_monster[i]->getPosition(),
+                if (N::contact(_monster[i]->getPosition(),
                             _monster[i]->getLocalBounds(), _fireball[j]->getPosition(),
                             _fireball[j]->getLocalBounds(), 15.0f))
                 {
@@ -2057,7 +1043,7 @@ int main()
         {
           if (_monster[i] != 0)
           {
-            if (contact(_dragon.getPosition(),
+            if (N::contact(_dragon.getPosition(),
                         _dragon.getLocalBounds(), _monster[i]->getPosition(),
                         _monster[i]->getLocalBounds(), 50.0f))
             {
@@ -2067,7 +1053,7 @@ int main()
         }
         /// Bonus Apparition
         // Spawning
-        if (_t_passedInGame >= nextBonusSpawnDate(_bonusCount))
+        if (_t_passedInGame >= N::nextBonusSpawnDate(_bonusCount))
         {
           for (unsigned int i = 0 ; i < MAX_BONUS ; ++i)
           {
@@ -2107,7 +1093,7 @@ int main()
         {
           if (_bonus[i] != 0)
           {
-            if (contact(_dragon.getPosition(),
+            if (N::contact(_dragon.getPosition(),
                         _dragon.getLocalBounds(), _bonus[i]->getPosition(),
                         _bonus[i]->getLocalBounds(), 6.0f))
             {
@@ -2125,7 +1111,7 @@ int main()
             FBEFFECT_DURATION) _dragonFireballPowered = false;
         /// Epolar Boss
         // Spawning
-        if (_t_passedInGame >= nextEpolarSpawnDate(_epolarTotalCount))
+        if (_t_passedInGame >= N::nextEpolarSpawnDate(_epolarTotalCount))
         {
           for (unsigned int i = 0 ; i < MAX_EPOLAR ; i++)
           {
@@ -2195,7 +1181,7 @@ int main()
                 if (_t_passedInGame - _epolarPhases[i][1] > _epolarPhasesTime[1])
                 {
                   _epolarYDiff =
-                    objectif_y(_epolar[i]->getPosition(),_dragon.getPosition(),0) -
+                    N::objectif_y(_epolar[i]->getPosition(),_dragon.getPosition(),0) -
                     _epolar[i]->getPosition().y;
                   _epolarPhases[i][1] = 0;
                   _epolarPhases[i][2] = _t_passedInGame;
@@ -2230,7 +1216,7 @@ int main()
                 if (_t_passedInGame - _epolarPhases[i][3] > _epolarPhasesTime[3])
                 {
                   _epolarYDiff =
-                    objectif_y(_epolar[i]->getPosition(),_dragon.getPosition(),WIN_WIDTH -
+                    N::objectif_y(_epolar[i]->getPosition(),_dragon.getPosition(),WIN_WIDTH -
                                _epolar[i]->getLocalBounds().width) - _epolar[i]->getPosition().y;
                   _epolarPhases[i][3] = 0;
                   _epolarPhases[i][4] = _t_passedInGame;
@@ -2256,7 +1242,7 @@ int main()
             {
               if (_fireball[j] != 0) /// If the fireball exists !
               {
-                if (contact(_epolar[i]->getPosition(),
+                if (N::contact(_epolar[i]->getPosition(),
                             _epolar[i]->getLocalBounds(), _fireball[j]->getPosition(),
                             _fireball[j]->getLocalBounds(), 15.0f))
                 {
@@ -2294,7 +1280,7 @@ int main()
         {
           if (_epolar[i] != 0)
           {
-            if (contact(_dragon.getPosition(),
+            if (N::contact(_dragon.getPosition(),
                         _dragon.getLocalBounds(), _epolar[i]->getPosition(),
                         _epolar[i]->getLocalBounds(), 50.0f))
             {
@@ -2703,47 +1689,29 @@ int main()
         }
         /// Volume Updating
         _music.setVolume(_music_volume);
-        if (_music_repeatfolder)
-        {
-          if (_music.getDuration().asSeconds() <=
-              _music.getPlayingOffset().asSeconds() + 0.5f)
-          {
-            *_listeSelected[LISTE_MUSIQUES] =
-              (_music_randomfolder) ? rand() % _music_list.size() :
-              (*_listeSelected[LISTE_MUSIQUES] + 1) % _music_list.size();
-            _music.stop();
-            _music.openFromFile("assets/audio/musiques/"+_music_list.at(*_listeSelected[LISTE_MUSIQUES]));
-            _music.play();
-          }
-        }
         /// Sound Updating : is any sound over ?
         for (unsigned int i = 0 ; i < MAX_SOUNDS ; i++)
         {
-          if (_firehorn[i] != 0 &&
-              _firehorn[i]->getPlayingOffset().asSeconds() > 1.6f)
+          if (_firehorn[i] != 0 && _firehorn[i]->getPlayingOffset().asSeconds() > 1.6f)
           {
             delete _firehorn[i];
             _firehorn[i] = 0;
           }
         }
         /// FPS Controller
-        sf::sleep(milliseconds(_t_fps -
-                               _chrono.getElapsedTime().asMilliseconds()));
+        sf::sleep(milliseconds(_t_fps - _chrono.getElapsedTime().asMilliseconds()));
         /// FPS F3
         _lasttime = _chrono.getElapsedTime().asMilliseconds();
         _fpscount = 1000 / _lasttime;
         sprintf_s(_fpschr, "FPS : %d", _fpscount);
         _fpsstr = _fpschr;
         _fps.setString(_fpsstr);
-        if (_showFPS)
-          _window.draw(_fps);
+        if (_showFPS) _window.draw(_fps);
         /// Displaying the final rendering
-        _cursor.setPosition((Vector2f)Mouse::getPosition(_window));
-        _window.draw(_cursor);
+        N::Cursor::GetInstance()->drawOnWindow(&_window);
         _window.display();
         /// Updating Time Passed In Game
-        _t_passedInGame +=
-          _chrono.getElapsedTime().asMilliseconds();
+        _t_passedInGame += _chrono.getElapsedTime().asMilliseconds();
       }
     }
     /// OPTION MENU LOOP
@@ -2757,212 +1725,101 @@ int main()
         // Refresh menu id
         _menu_actuel = _menu_prochain;
         /// Event Managing Options
-        // Event Binding
-        if (_window.pollEvent(_event))
+        N::EventManager::GetInstance()->bind(&_window);
+        if (N::EventManager::GetInstance()->isCloseTriggered())
         {
-          if (_event.type == Event::Closed)
-          {
-            _window.close();
-            _playerIsInOption = false;
-          } // Red Cross
-          for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-          {
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code == i)
-            {
-              _key[i] = true;
-            }
-            if (_event.type == Event::KeyReleased &&
-                _event.key.code == i)
-            {
-              _key[i] = false;
-              _keypressed[i] = false;
-            }
-            if (i < Mouse::ButtonCount && _event.type ==
-                Event::MouseButtonPressed && _event.mouseButton.button == i)
-            {
-              _button[i] = true;
-            }
-            if (i < Mouse::ButtonCount && _event.type ==
-                Event::MouseButtonReleased && _event.mouseButton.button == i)
-            {
-              _button[i] = false;
-              _buttonpressed[i] = false;
-            }
-          }
+          _window.close();
+          _playerIsInOption = false;
         }
         /// Mouse binding
         switch (_menu_actuel)
         {
           case MENU_MAIN:
             // Retour au jeu quand on est dans le main
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_RETOUR_JEU]->getPosition(),
-                        _menuBarre[BUT_RETOUR_JEU]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_RETOUR_JEU]))
             {
-              _menuBarreRect[BUT_RETOUR_JEU]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_RETOUR_JEU]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _playerIsInGame = true;
                 _playerIsInOption = false;
-                _buttonpressed[Mouse::Left] = true;
               }
             }
             else
             {
-              _menuBarreRect[BUT_RETOUR_JEU]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_RETOUR_JEU]->top = BUT_MOUSEOUT;
             }
             // Retour au jeu imminent
-            if (_key[Keyboard::Escape] &&
-                !_keypressed[Keyboard::Escape])
+            if (N::EventManager::GetInstance()->isKeyPressed(Keyboard::Escape, true))
             {
               _playerIsInGame = true;
               _playerIsInOption = false;
-              _keypressed[Keyboard::Escape] = true;
             }
             // Sons et musique quand on est dans le main
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f), _menuBarre[BUT_MUSIQUE]->getPosition()
-                        , _menuBarre[BUT_MUSIQUE]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_MUSIQUE]))
             {
-              _menuBarreRect[BUT_MUSIQUE]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_MUSIQUE]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isKeyPressed(Mouse::Left, true))
               {
                 _menu_prochain = MENU_MUSIQUE;
-                _buttonpressed[Mouse::Left] = true;
               }
             }
             else
             {
-              _menuBarreRect[BUT_MUSIQUE]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_MUSIQUE]->top = BUT_MOUSEOUT;
             }
             // Touches quand on est dans le main
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f), _menuBarre[BUT_TOUCHES]->getPosition()
-                        , _menuBarre[BUT_TOUCHES]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_TOUCHES]))
             {
-              _menuBarreRect[BUT_TOUCHES]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_TOUCHES]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isKeyPressed(Mouse::Left, true))
               {
                 _menu_prochain = MENU_TOUCHES;
-                _buttonpressed[Mouse::Left] = true;
               }
             }
             else
             {
-              _menuBarreRect[BUT_TOUCHES]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_TOUCHES]->top = BUT_MOUSEOUT;
             }
             break;
           case MENU_MUSIQUE:
             // Retour au jeu imminent
-            if (_key[Keyboard::Escape] &&
-                !_keypressed[Keyboard::Escape])
+            if (N::EventManager::GetInstance()->isKeyPressed(Keyboard::Escape, true))
             {
               _playerIsInGame = true;
               _playerIsInOption = false;
-              _keypressed[Keyboard::Escape] = true;
             }
             // Retour au menu principal quand on est dans l'un des deux autres menus
-            if (contact((Vector2f)Mouse::getPosition(_window), FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_RETOUR_MAIN]->getPosition(),
-                        _menuBarre[BUT_RETOUR_MAIN]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_RETOUR_MAIN]))
             {
-              _menuBarreRect[BUT_RETOUR_MAIN]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_RETOUR_MAIN]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menu_prochain = MENU_MAIN;
-                _buttonpressed[Mouse::Left] = true;
               }
             }
             else
             {
-              _menuBarreRect[BUT_RETOUR_MAIN]->top =
-                BUT_MOUSEOUT;
-            }
-            // Répétition
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_MUSIC_REPEAT]->getPosition(),
-                        _menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds()))
-            {
-              _menuBarreRect[BUT_MUSIC_REPEAT]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
-              {
-                if (_music_repeatfolder &&
-                    !_music_randomfolder)
-                {
-                  _music_randomfolder = true;
-                  _menuTxtBarre[BUT_MUSIC_REPEAT]->setString("Répétition : musique suivante au hasard");
-                  _menuTxtBarre[BUT_MUSIC_REPEAT]->setPosition(_menuBarre[BUT_MUSIC_REPEAT]->getPosition().x + (_menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width -
-                      _menuTxtBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width )/2,
-                      _menuBarre[BUT_MUSIC_REPEAT]->getPosition().y +
-                      (_menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().height-
-                       _menuTxtBarre[BUT_MUSIC_REPEAT]->getLocalBounds().height)/4);
-                }
-                else if (_music_repeatfolder &&
-                         _music_randomfolder)
-                {
-                  _music_repeatfolder = false;
-                  _music_randomfolder = false;
-                  _menuTxtBarre[BUT_MUSIC_REPEAT]->setString("Répétition : musique sélectionnée");
-                  _menuTxtBarre[BUT_MUSIC_REPEAT]->setPosition(_menuBarre[BUT_MUSIC_REPEAT]->getPosition().x + (_menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width -
-                      _menuTxtBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width )/2,
-                      _menuBarre[BUT_MUSIC_REPEAT]->getPosition().y +
-                      (_menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().height-
-                       _menuTxtBarre[BUT_MUSIC_REPEAT]->getLocalBounds().height)/4);
-                }
-                else
-                {
-                  _music_repeatfolder = true;
-                  _menuTxtBarre[BUT_MUSIC_REPEAT]->setString("Répétition : dossier entier");
-                  _menuTxtBarre[BUT_MUSIC_REPEAT]->setPosition(_menuBarre[BUT_MUSIC_REPEAT]->getPosition().x + (_menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width -
-                      _menuTxtBarre[BUT_MUSIC_REPEAT]->getLocalBounds().width )/2,
-                      _menuBarre[BUT_MUSIC_REPEAT]->getPosition().y +
-                      (_menuBarre[BUT_MUSIC_REPEAT]->getLocalBounds().height-
-                       _menuTxtBarre[BUT_MUSIC_REPEAT]->getLocalBounds().height)/4);
-                }
-                _buttonpressed[Mouse::Left] = true;
-              }
-            }
-            else
-            {
-              _menuBarreRect[BUT_MUSIC_REPEAT]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_RETOUR_MAIN]->top = BUT_MOUSEOUT;
             }
             // Jauge de son
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuJaugeFond[JAUGE_SON]->getPosition(),
-                        _menuJaugeFond[JAUGE_SON]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuJaugeFond[JAUGE_SON]))
             {
               _menuJaugeRect[JAUGE_SON]->top = BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
-                _menuJaugeCursor[JAUGE_SON]->setPosition(max(_menuJaugeFond[JAUGE_SON]->getPosition().x,
-                    min((float)Mouse::getPosition(_window).x -
-                        _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width/2,
-                        _menuJaugeFond[JAUGE_SON]->getPosition().x + 729.0f -
-                        _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width)),
-                    _menuJaugeCursor[JAUGE_SON]->getPosition().y);
-                _firehorn_volume =
-                  100*(_menuJaugeCursor[JAUGE_SON]->getPosition().x -
-                       _menuJaugeFond[JAUGE_SON]->getPosition().x)/(729.0f -
-                           _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width);
+                _menuJaugeCursor[JAUGE_SON]->setPosition(
+                  max(
+                    _menuJaugeFond[JAUGE_SON]->getPosition().x,
+                    min(
+                      (float)Mouse::getPosition(_window).x - _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width / 2,
+                      _menuJaugeFond[JAUGE_SON]->getPosition().x + 729.0f - _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width
+                    )
+                  ),
+                  _menuJaugeCursor[JAUGE_SON]->getPosition().y
+                );
+                _firehorn_volume = 100 * (_menuJaugeCursor[JAUGE_SON]->getPosition().x - _menuJaugeFond[JAUGE_SON]->getPosition().x)
+                  / (729.0f - _menuJaugeCursor[JAUGE_SON]->getLocalBounds().width);
               }
             }
             else
@@ -2970,195 +1827,55 @@ int main()
               _menuJaugeRect[JAUGE_SON]->top = BUT_MOUSEOUT;
             }
             // Jauge de musique
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuJaugeFond[JAUGE_MUSIQUE]->getPosition(),
-                        _menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuJaugeFond[JAUGE_MUSIQUE]))
             {
               _menuJaugeRect[JAUGE_MUSIQUE]->top = BUT_MOUSEON;
-              if (_button[Mouse::Left] && !_buttonpressed[Mouse::Left])
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
-                _menuJaugeCursor[JAUGE_MUSIQUE]->setPosition(max(_menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x,
-                    min((float)Mouse::getPosition(_window).x -
-                        _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width/2,
-                        _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + 729.0f -
-                        _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width)),
-                    _menuJaugeCursor[JAUGE_MUSIQUE]->getPosition().y);
-                _music_volume =
-                  100*(_menuJaugeCursor[JAUGE_MUSIQUE]->getPosition().x -
-                       _menuJaugeFond[JAUGE_SON]->getPosition().x)/(729.0f -
-                           _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width);
+                _menuJaugeCursor[JAUGE_MUSIQUE]->setPosition(
+                  max(
+                    _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x,
+                    min(
+                      (float)Mouse::getPosition(_window).x - _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width / 2,
+                      _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + 729.0f - _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width
+                    )
+                  ),
+                  _menuJaugeCursor[JAUGE_MUSIQUE]->getPosition().y
+                );
+                _music_volume = 100 * (_menuJaugeCursor[JAUGE_MUSIQUE]->getPosition().x - _menuJaugeFond[JAUGE_SON]->getPosition().x)
+                  / (729.0f - _menuJaugeCursor[JAUGE_MUSIQUE]->getLocalBounds().width);
               }
             }
             else
             {
               _menuJaugeRect[JAUGE_MUSIQUE]->top = BUT_MOUSEOUT;
             }
-            // Liste des musiques : flèche du haut
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _listeFlecheHaut[LISTE_MUSIQUES]->getPosition(),
-                        _listeFlecheHaut[LISTE_MUSIQUES]->getLocalBounds()))
-            {
-              _listeFlecheHaut[LISTE_MUSIQUES]->setColor(Color(191,191,191));
-              if (_button[Mouse::Left] && !_buttonpressed[Mouse::Left])
-              {
-                *_listeCurseur[LISTE_MUSIQUES] = max((unsigned int)0, *_listeCurseur[LISTE_MUSIQUES] - 1);
-                _buttonpressed[Mouse::Left] = true;
-              }
-            }
-            else
-            {
-              _listeFlecheHaut[LISTE_MUSIQUES]->setColor(Color(255,255,255));
-            }
-            // Liste des musiques : flèche du bas
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _listeFlecheBas[LISTE_MUSIQUES]->getPosition(),
-                        _listeFlecheHaut[LISTE_MUSIQUES]->getLocalBounds()))
-            {
-              _listeFlecheBas[LISTE_MUSIQUES]->setColor(Color(191,191,191));
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
-              {
-                *_listeCurseur[LISTE_MUSIQUES] = min(max((unsigned int)0, static_cast<unsigned int>(_listeChoixStr[LISTE_MUSIQUES].size()) - _listeContenance), *_listeCurseur[LISTE_MUSIQUES] + 1);
-                _buttonpressed[Mouse::Left] = true;
-              }
-            }
-            else
-            {
-              _listeFlecheBas[LISTE_MUSIQUES]->setColor(Color(255,255,255));
-            }
-            // Premier slot de la liste de la musique
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _listeChoix0[LISTE_MUSIQUES]->getPosition(),
-                        _listeChoix0[LISTE_MUSIQUES]->getLocalBounds()))
-            {
-              if (*_listeSelected[LISTE_MUSIQUES] ==
-                  *_listeCurseur[LISTE_MUSIQUES] + 0)
-                _listeChoixTxt0[LISTE_MUSIQUES]->setFillColor(Color(127,255,127));
-              else
-                _listeChoixTxt0[LISTE_MUSIQUES]->setFillColor(Color(000,255,255));
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
-              {
-                _music.stop();
-                _music.openFromFile("assets/audio/musiques/" +
-                                    _music_list.at(*_listeCurseur[LISTE_MUSIQUES] + 0));
-                _music.play();
-                *_listeSelected[LISTE_MUSIQUES] =
-                  *_listeCurseur[LISTE_MUSIQUES] + 0;
-              }
-            }
-            else
-            {
-              if (*_listeSelected[LISTE_MUSIQUES] ==
-                  *_listeCurseur[LISTE_MUSIQUES] + 0)
-                _listeChoixTxt0[LISTE_MUSIQUES]->setFillColor(Color(255,255,000));
-              else
-                _listeChoixTxt0[LISTE_MUSIQUES]->setFillColor(Color(255,255,255));
-            }
-            // Deuxième slot de la liste de la musique
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _listeChoix1[LISTE_MUSIQUES]->getPosition(),
-                        _listeChoix1[LISTE_MUSIQUES]->getLocalBounds()))
-            {
-              if (*_listeSelected[LISTE_MUSIQUES] ==
-                  *_listeCurseur[LISTE_MUSIQUES] + 1)
-                _listeChoixTxt1[LISTE_MUSIQUES]->setFillColor(Color(127,255,127));
-              else
-                _listeChoixTxt1[LISTE_MUSIQUES]->setFillColor(Color(000,255,255));
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
-              {
-                _music.stop();
-                _music.openFromFile("assets/audio/musiques/" +
-                                    _music_list.at(*_listeCurseur[LISTE_MUSIQUES] + 1));
-                _music.play();
-                *_listeSelected[LISTE_MUSIQUES] =
-                  *_listeCurseur[LISTE_MUSIQUES] + 1;
-              }
-            }
-            else
-            {
-              if (*_listeSelected[LISTE_MUSIQUES] ==
-                  *_listeCurseur[LISTE_MUSIQUES] + 1)
-                _listeChoixTxt1[LISTE_MUSIQUES]->setFillColor(Color(255,255,000));
-              else
-                _listeChoixTxt1[LISTE_MUSIQUES]->setFillColor(Color(255,255,255));
-            }
-            // Troisième slot de la liste de la musique
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _listeChoix2[LISTE_MUSIQUES]->getPosition(),
-                        _listeChoix2[LISTE_MUSIQUES]->getLocalBounds()))
-            {
-              if (*_listeSelected[LISTE_MUSIQUES] ==
-                  *_listeCurseur[LISTE_MUSIQUES] + 2)
-                _listeChoixTxt2[LISTE_MUSIQUES]->setFillColor(Color(127,255,127));
-              else
-                _listeChoixTxt2[LISTE_MUSIQUES]->setFillColor(Color(000,255,255));
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
-              {
-                _music.stop();
-                _music.openFromFile("assets/audio/musiques/" +
-                                    _music_list.at(*_listeCurseur[LISTE_MUSIQUES] + 2));
-                _music.play();
-                *_listeSelected[LISTE_MUSIQUES] =
-                  *_listeCurseur[LISTE_MUSIQUES] + 2;
-              }
-            }
-            else
-            {
-              if (*_listeSelected[LISTE_MUSIQUES] ==
-                  *_listeCurseur[LISTE_MUSIQUES] + 2)
-                _listeChoixTxt2[LISTE_MUSIQUES]->setFillColor(Color(255,255,000));
-              else
-                _listeChoixTxt2[LISTE_MUSIQUES]->setFillColor(Color(255,255,255));
-            }
             break;
           case MENU_TOUCHES:
             // Retour au jeu imminent
-            if (_key[Keyboard::Escape] &&
-                !_keypressed[Keyboard::Escape])
+            if (N::EventManager::GetInstance()->isKeyPressed(Keyboard::Escape, true))
             {
               _playerIsInGame = true;
               _playerIsInOption = false;
-              _keypressed[Keyboard::Escape] = true;
             }
             // Retour au menu principal quand on est dans l'un des deux autres menus
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_RETOUR_MAIN]->getPosition(),
-                        _menuBarre[BUT_RETOUR_MAIN]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_RETOUR_MAIN]))
             {
-              _menuBarreRect[BUT_RETOUR_MAIN]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_RETOUR_MAIN]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menu_prochain = MENU_MAIN;
-                _buttonpressed[Mouse::Left] = true;
               }
             }
             else
             {
-              _menuBarreRect[BUT_RETOUR_MAIN]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_RETOUR_MAIN]->top = BUT_MOUSEOUT;
             }
             // La touche d'accélération
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_KEY_ACCERELATE]->getPosition(),
-                        _menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_KEY_ACCERELATE]))
             {
-              _menuBarreRect[BUT_KEY_ACCERELATE]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_KEY_ACCERELATE]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menuTxtBarre[BUT_KEY_ACCERELATE]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_ACCERELATE]);
@@ -3168,19 +1885,13 @@ int main()
             }
             else
             {
-              _menuBarreRect[BUT_KEY_ACCERELATE]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_KEY_ACCERELATE]->top = BUT_MOUSEOUT;
             }
             // La touche pour aller à droite
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_KEY_FORWARD]->getPosition(),
-                        _menuBarre[BUT_KEY_FORWARD]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_KEY_FORWARD]))
             {
-              _menuBarreRect[BUT_KEY_FORWARD]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_KEY_FORWARD]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menuTxtBarre[BUT_KEY_FORWARD]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_FORWARD]);
@@ -3190,19 +1901,13 @@ int main()
             }
             else
             {
-              _menuBarreRect[BUT_KEY_FORWARD]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_KEY_FORWARD]->top = BUT_MOUSEOUT;
             }
             // La touche pour aller à gauche
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_KEY_BACKWARD]->getPosition(),
-                        _menuBarre[BUT_KEY_BACKWARD]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_KEY_BACKWARD]))
             {
-              _menuBarreRect[BUT_KEY_BACKWARD]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_KEY_BACKWARD]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menuTxtBarre[BUT_KEY_BACKWARD]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_BACKWARD]);
@@ -3212,18 +1917,13 @@ int main()
             }
             else
             {
-              _menuBarreRect[BUT_KEY_BACKWARD]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_KEY_BACKWARD]->top = BUT_MOUSEOUT;
             }
             // La touche pour aller en haut
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f), _menuBarre[BUT_KEY_GOUP]->getPosition()
-                        , _menuBarre[BUT_KEY_GOUP]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_KEY_GOUP]))
             {
-              _menuBarreRect[BUT_KEY_GOUP]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_KEY_GOUP]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menuTxtBarre[BUT_KEY_GOUP]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_GOUP]);
@@ -3233,19 +1933,13 @@ int main()
             }
             else
             {
-              _menuBarreRect[BUT_KEY_GOUP]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_KEY_GOUP]->top = BUT_MOUSEOUT;
             }
             // La touche pour aller en bas
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_KEY_GODOWN]->getPosition(),
-                        _menuBarre[BUT_KEY_GODOWN]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_KEY_GODOWN]))
             {
-              _menuBarreRect[BUT_KEY_GODOWN]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_KEY_GODOWN]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menuTxtBarre[BUT_KEY_GODOWN]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_GODOWN]);
@@ -3255,19 +1949,13 @@ int main()
             }
             else
             {
-              _menuBarreRect[BUT_KEY_GODOWN]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_KEY_GODOWN]->top = BUT_MOUSEOUT;
             }
             // La touche pour afficher les fps
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_KEY_FPSDISP]->getPosition(),
-                        _menuBarre[BUT_KEY_FPSDISP]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_KEY_FPSDISP]))
             {
-              _menuBarreRect[BUT_KEY_FPSDISP]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_KEY_FPSDISP]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menuTxtBarre[BUT_KEY_FPSDISP]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_FPSDISP]);
@@ -3277,19 +1965,13 @@ int main()
             }
             else
             {
-              _menuBarreRect[BUT_KEY_FPSDISP]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_KEY_FPSDISP]->top = BUT_MOUSEOUT;
             }
             // La touche pour tirer
-            if (contact((Vector2f)Mouse::getPosition(_window)
-                        , FloatRect(1.0f,1.0f,1.0f,1.0f),
-                        _menuBarre[BUT_KEY_FIREBALL]->getPosition(),
-                        _menuBarre[BUT_KEY_FIREBALL]->getLocalBounds()))
+            if (N::Cursor::GetInstance()->point(*_menuBarre[BUT_KEY_FIREBALL]))
             {
-              _menuBarreRect[BUT_KEY_FIREBALL]->top =
-                BUT_MOUSEON;
-              if (_button[Mouse::Left] &&
-                  !_buttonpressed[Mouse::Left])
+              _menuBarreRect[BUT_KEY_FIREBALL]->top = BUT_MOUSEON;
+              if (N::EventManager::GetInstance()->isButtonPressed(Mouse::Left, true))
               {
                 _menuTxtBarre[BUT_KEY_FIREBALL]->setFillColor(Color(255,255,0));
                 _window.draw(*_menuTxtBarre[BUT_KEY_FIREBALL]);
@@ -3299,15 +1981,13 @@ int main()
             }
             else
             {
-              _menuBarreRect[BUT_KEY_FIREBALL]->top =
-                BUT_MOUSEOUT;
+              _menuBarreRect[BUT_KEY_FIREBALL]->top = BUT_MOUSEOUT;
             }
             break;
           case MENU_TOUCHES_ACCELERATE:
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code != Keyboard::Escape)
+            if (N::EventManager::GetInstance()->aKeyPressedButEscape())
             {
-              _keyid[KEYB_ACCELERATE] = _event.key.code;
+              _keyid[KEYB_ACCELERATE] = N::EventManager::GetInstance()->lastKeycode();
               _menuTxtBarre[BUT_KEY_ACCERELATE]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_ACCERELATE]);
               _window.display();
@@ -3315,10 +1995,9 @@ int main()
             }
             break;
           case MENU_TOUCHES_FORWARD:
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code != Keyboard::Escape)
+            if (N::EventManager::GetInstance()->aKeyPressedButEscape())
             {
-              _keyid[KEYB_FORWARD] = _event.key.code;
+              _keyid[KEYB_FORWARD] = N::EventManager::GetInstance()->lastKeycode();
               _menuTxtBarre[BUT_KEY_FORWARD]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_FORWARD]);
               _window.display();
@@ -3326,10 +2005,9 @@ int main()
             }
             break;
           case MENU_TOUCHES_BACKWARD:
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code != Keyboard::Escape)
+            if (N::EventManager::GetInstance()->aKeyPressedButEscape())
             {
-              _keyid[KEYB_BACKWARD] = _event.key.code;
+              _keyid[KEYB_BACKWARD] = N::EventManager::GetInstance()->lastKeycode();
               _menuTxtBarre[BUT_KEY_BACKWARD]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_BACKWARD]);
               _window.display();
@@ -3337,10 +2015,9 @@ int main()
             }
             break;
           case MENU_TOUCHES_GOUP:
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code != Keyboard::Escape)
+            if (N::EventManager::GetInstance()->aKeyPressedButEscape())
             {
-              _keyid[KEYB_GOUP] = _event.key.code;
+              _keyid[KEYB_GOUP] = N::EventManager::GetInstance()->lastKeycode();
               _menuTxtBarre[BUT_KEY_GOUP]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_GOUP]);
               _window.display();
@@ -3348,10 +2025,9 @@ int main()
             }
             break;
           case MENU_TOUCHES_GODOWN:
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code != Keyboard::Escape)
+            if (N::EventManager::GetInstance()->aKeyPressedButEscape())
             {
-              _keyid[KEYB_GODOWN] = _event.key.code;
+              _keyid[KEYB_GODOWN] = N::EventManager::GetInstance()->lastKeycode();
               _menuTxtBarre[BUT_KEY_GODOWN]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_GODOWN]);
               _window.display();
@@ -3359,10 +2035,9 @@ int main()
             }
             break;
           case MENU_TOUCHES_FPSDISP:
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code != Keyboard::Escape)
+            if (N::EventManager::GetInstance()->aKeyPressedButEscape())
             {
-              _keyid[KEYB_FPSDISP] = _event.key.code;
+              _keyid[KEYB_FPSDISP] = N::EventManager::GetInstance()->lastKeycode();
               _menuTxtBarre[BUT_KEY_FPSDISP]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_FPSDISP]);
               _window.display();
@@ -3370,10 +2045,9 @@ int main()
             }
             break;
           case MENU_TOUCHES_FIREBALL:
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code != Keyboard::Escape)
+            if (N::EventManager::GetInstance()->aKeyPressedButEscape())
             {
-              _keyid[KEYB_FIREBALL] = _event.key.code;
+              _keyid[KEYB_FIREBALL] = N::EventManager::GetInstance()->lastKeycode();
               _menuTxtBarre[BUT_KEY_FIREBALL]->setFillColor(Color(255,255,255));
               _window.draw(*_menuTxtBarre[BUT_KEY_FIREBALL]);
               _window.display();
@@ -3383,19 +2057,6 @@ int main()
         }
         /// SOUND
         _music.setVolume(_music_volume);
-        if (_music_repeatfolder)
-        {
-          if (_music.getDuration().asSeconds() <=
-              _music.getPlayingOffset().asSeconds() + 0.5f)
-          {
-            *_listeSelected[LISTE_MUSIQUES] =
-              (_music_randomfolder) ? rand() % _music_list.size() :
-              (*_listeSelected[LISTE_MUSIQUES] + 1) % _music_list.size();
-            _music.stop();
-            _music.openFromFile("assets/audio/musiques/"+_music_list.at(*_listeSelected[LISTE_MUSIQUES]));
-            _music.play();
-          }
-        }
         /// DRAWING
         for (unsigned i = 0 ; i < NBR_BUTTONS ; ++i)
         {
@@ -3438,129 +2099,88 @@ int main()
           case MENU_TOUCHES:
             _window.draw(*_menuBarre[BUT_RETOUR_MAIN]);
             _window.draw(*_menuTxtBarre[BUT_RETOUR_MAIN]);
-            _menuTxtBarre[BUT_KEY_ACCERELATE]->setString("Accélérer : "+keystring(_keyid[KEYB_ACCELERATE]));
-            _menuTxtBarre[BUT_KEY_ACCERELATE]->setPosition(_menuBarre[BUT_KEY_ACCERELATE]->getPosition().x +
-                (_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width -
-                 _menuTxtBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width )/2,
-                _menuBarre[BUT_KEY_ACCERELATE]->getPosition().y +
-                (_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().height-
-                 _menuTxtBarre[BUT_KEY_ACCERELATE]->getLocalBounds().height)/4);
+
+            _menuTxtBarre[BUT_KEY_ACCERELATE]->setString("Accélérer : "+N::keystring(_keyid[KEYB_ACCELERATE]));
+            _menuTxtBarre[BUT_KEY_ACCERELATE]->setPosition(
+              _menuBarre[BUT_KEY_ACCERELATE]->getPosition().x + (_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width - _menuTxtBarre[BUT_KEY_ACCERELATE]->getLocalBounds().width ) / 2,
+              _menuBarre[BUT_KEY_ACCERELATE]->getPosition().y + (_menuBarre[BUT_KEY_ACCERELATE]->getLocalBounds().height- _menuTxtBarre[BUT_KEY_ACCERELATE]->getLocalBounds().height) / 4);
             _window.draw(*_menuBarre[BUT_KEY_ACCERELATE]);
             _window.draw(*_menuTxtBarre[BUT_KEY_ACCERELATE]);
-            _menuTxtBarre[BUT_KEY_FORWARD]->setString("Aller vers la droite : "+keystring(_keyid[KEYB_FORWARD]));
-            _menuTxtBarre[BUT_KEY_FORWARD]->setPosition(_menuBarre[BUT_KEY_FORWARD]->getPosition().x + (_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().width -
-                _menuTxtBarre[BUT_KEY_FORWARD]->getLocalBounds().width )/2,
-                _menuBarre[BUT_KEY_FORWARD]->getPosition().y +
-                (_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().height-
-                 _menuTxtBarre[BUT_KEY_FORWARD]->getLocalBounds().height)/4);
+
+            _menuTxtBarre[BUT_KEY_FORWARD]->setString("Aller vers la droite : "+N::keystring(_keyid[KEYB_FORWARD]));
+            _menuTxtBarre[BUT_KEY_FORWARD]->setPosition(
+              _menuBarre[BUT_KEY_FORWARD]->getPosition().x + (_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().width - _menuTxtBarre[BUT_KEY_FORWARD]->getLocalBounds().width ) / 2,
+              _menuBarre[BUT_KEY_FORWARD]->getPosition().y + (_menuBarre[BUT_KEY_FORWARD]->getLocalBounds().height- _menuTxtBarre[BUT_KEY_FORWARD]->getLocalBounds().height) / 4);
             _window.draw(*_menuBarre[BUT_KEY_FORWARD]);
             _window.draw(*_menuTxtBarre[BUT_KEY_FORWARD]);
-            _menuTxtBarre[BUT_KEY_FPSDISP]->setString("Afficher les FPS : "+keystring(_keyid[KEYB_FPSDISP]));
-            _menuTxtBarre[BUT_KEY_FPSDISP]->setPosition(_menuBarre[BUT_KEY_FPSDISP]->getPosition().x + (_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().width -
-                _menuTxtBarre[BUT_KEY_FPSDISP]->getLocalBounds().width )/2,
-                _menuBarre[BUT_KEY_FPSDISP]->getPosition().y +
-                (_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().height-
-                 _menuTxtBarre[BUT_KEY_FPSDISP]->getLocalBounds().height)/4);
+
+            _menuTxtBarre[BUT_KEY_FPSDISP]->setString("Afficher les FPS : "+N::keystring(_keyid[KEYB_FPSDISP]));
+            _menuTxtBarre[BUT_KEY_FPSDISP]->setPosition(
+              _menuBarre[BUT_KEY_FPSDISP]->getPosition().x + (_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().width - _menuTxtBarre[BUT_KEY_FPSDISP]->getLocalBounds().width ) / 2,
+              _menuBarre[BUT_KEY_FPSDISP]->getPosition().y + (_menuBarre[BUT_KEY_FPSDISP]->getLocalBounds().height- _menuTxtBarre[BUT_KEY_FPSDISP]->getLocalBounds().height) / 4);
             _window.draw(*_menuBarre[BUT_KEY_FPSDISP]);
             _window.draw(*_menuTxtBarre[BUT_KEY_FPSDISP]);
-            _menuTxtBarre[BUT_KEY_FIREBALL]->setString("Tirer : "+keystring(_keyid[KEYB_FIREBALL]));
-            _menuTxtBarre[BUT_KEY_FIREBALL]->setPosition(_menuBarre[BUT_KEY_FIREBALL]->getPosition().x + (_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().width -
-                _menuTxtBarre[BUT_KEY_FIREBALL]->getLocalBounds().width )/2,
-                _menuBarre[BUT_KEY_FIREBALL]->getPosition().y +
-                (_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().height-
-                 _menuTxtBarre[BUT_KEY_FIREBALL]->getLocalBounds().height)/4);
+
+            _menuTxtBarre[BUT_KEY_FIREBALL]->setString("Tirer : "+N::keystring(_keyid[KEYB_FIREBALL]));
+            _menuTxtBarre[BUT_KEY_FIREBALL]->setPosition(
+              _menuBarre[BUT_KEY_FIREBALL]->getPosition().x + (_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().width - _menuTxtBarre[BUT_KEY_FIREBALL]->getLocalBounds().width ) / 2,
+              _menuBarre[BUT_KEY_FIREBALL]->getPosition().y + (_menuBarre[BUT_KEY_FIREBALL]->getLocalBounds().height- _menuTxtBarre[BUT_KEY_FIREBALL]->getLocalBounds().height)/4);
             _window.draw(*_menuBarre[BUT_KEY_FIREBALL]);
             _window.draw(*_menuTxtBarre[BUT_KEY_FIREBALL]);
-            _menuTxtBarre[BUT_KEY_GOUP]->setString("Aller vers le haut : "+keystring(_keyid[KEYB_GOUP]));
-            _menuTxtBarre[BUT_KEY_GOUP]->setPosition(_menuBarre[BUT_KEY_GOUP]->getPosition().x + (_menuBarre[BUT_KEY_GOUP]->getLocalBounds().width -
-                _menuTxtBarre[BUT_KEY_GOUP]->getLocalBounds().width )/2,
-                _menuBarre[BUT_KEY_GOUP]->getPosition().y +
-                (_menuBarre[BUT_KEY_GOUP]->getLocalBounds().height-
-                 _menuTxtBarre[BUT_KEY_GOUP]->getLocalBounds().height)/4);
+
+            _menuTxtBarre[BUT_KEY_GOUP]->setString("Aller vers le haut : "+N::keystring(_keyid[KEYB_GOUP]));
+            _menuTxtBarre[BUT_KEY_GOUP]->setPosition(
+              _menuBarre[BUT_KEY_GOUP]->getPosition().x + (_menuBarre[BUT_KEY_GOUP]->getLocalBounds().width - _menuTxtBarre[BUT_KEY_GOUP]->getLocalBounds().width ) / 2,
+              _menuBarre[BUT_KEY_GOUP]->getPosition().y + (_menuBarre[BUT_KEY_GOUP]->getLocalBounds().height- _menuTxtBarre[BUT_KEY_GOUP]->getLocalBounds().height) / 4);
             _window.draw(*_menuBarre[BUT_KEY_GOUP]);
             _window.draw(*_menuTxtBarre[BUT_KEY_GOUP]);
-            _menuTxtBarre[BUT_KEY_BACKWARD]->setString("Aller vers la gauche : "+keystring(_keyid[KEYB_BACKWARD]));
-            _menuTxtBarre[BUT_KEY_BACKWARD]->setPosition(_menuBarre[BUT_KEY_BACKWARD]->getPosition().x + (_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().width -
-                _menuTxtBarre[BUT_KEY_BACKWARD]->getLocalBounds().width )/2,
-                _menuBarre[BUT_KEY_BACKWARD]->getPosition().y +
-                (_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().height-
-                 _menuTxtBarre[BUT_KEY_BACKWARD]->getLocalBounds().height)/4);
+
+            _menuTxtBarre[BUT_KEY_BACKWARD]->setString("Aller vers la gauche : "+N::keystring(_keyid[KEYB_BACKWARD]));
+            _menuTxtBarre[BUT_KEY_BACKWARD]->setPosition(
+              _menuBarre[BUT_KEY_BACKWARD]->getPosition().x + (_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().width - _menuTxtBarre[BUT_KEY_BACKWARD]->getLocalBounds().width ) / 2,
+              _menuBarre[BUT_KEY_BACKWARD]->getPosition().y + (_menuBarre[BUT_KEY_BACKWARD]->getLocalBounds().height- _menuTxtBarre[BUT_KEY_BACKWARD]->getLocalBounds().height) / 4);
             _window.draw(*_menuBarre[BUT_KEY_BACKWARD]);
             _window.draw(*_menuTxtBarre[BUT_KEY_BACKWARD]);
-            _menuTxtBarre[BUT_KEY_GODOWN]->setString("Aller vers le bas : "+keystring(_keyid[KEYB_GODOWN]));
-            _menuTxtBarre[BUT_KEY_GODOWN]->setPosition(_menuBarre[BUT_KEY_GODOWN]->getPosition().x + (_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().width -
-                _menuTxtBarre[BUT_KEY_GODOWN]->getLocalBounds().width )/2,
-                _menuBarre[BUT_KEY_GODOWN]->getPosition().y +
-                (_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().height-
-                 _menuTxtBarre[BUT_KEY_GODOWN]->getLocalBounds().height)/4);
+
+            _menuTxtBarre[BUT_KEY_GODOWN]->setString("Aller vers le bas : "+N::keystring(_keyid[KEYB_GODOWN]));
+            _menuTxtBarre[BUT_KEY_GODOWN]->setPosition(
+              _menuBarre[BUT_KEY_GODOWN]->getPosition().x + (_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().width - _menuTxtBarre[BUT_KEY_GODOWN]->getLocalBounds().width ) / 2,
+              _menuBarre[BUT_KEY_GODOWN]->getPosition().y + (_menuBarre[BUT_KEY_GODOWN]->getLocalBounds().height- _menuTxtBarre[BUT_KEY_GODOWN]->getLocalBounds().height) / 4);
             _window.draw(*_menuBarre[BUT_KEY_GODOWN]);
             _window.draw(*_menuTxtBarre[BUT_KEY_GODOWN]);
+
             break;
           case MENU_MUSIQUE:
-            _window.draw(*_menuJaugeFond[JAUGE_SON]);
-            _window.draw(*_menuJaugeCursor[JAUGE_SON]);
-            _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+intToString(static_cast<int>(_firehorn_volume))+" %");
-            _menuTxtJauge[JAUGE_SON]->setPosition(_menuJaugeFond[JAUGE_SON]->getPosition().x + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().width -
-                                                  _menuTxtJauge[JAUGE_SON]->getLocalBounds().width )/2,
-                                                  _menuJaugeFond[JAUGE_SON]->getPosition().y +
-                                                  (_menuJaugeFond[JAUGE_SON]->getLocalBounds().height-
-                                                   _menuTxtJauge[JAUGE_SON]->getLocalBounds().height)/4);
-            _window.draw(*_menuTxtJauge[JAUGE_SON]);
-            _window.draw(*_menuJaugeFond[JAUGE_MUSIQUE]);
-            _window.draw(*_menuJaugeCursor[JAUGE_MUSIQUE]);
-            _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique : "+intToString(static_cast<int>(_music_volume))+" %");
-            _menuTxtJauge[JAUGE_MUSIQUE]->setPosition(_menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width -
-                _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().width )/2,
-                _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y +
-                (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height-
-                 _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().height)/4);
-            _window.draw(*_menuTxtJauge[JAUGE_MUSIQUE]);
             _window.draw(*_menuBarre[BUT_RETOUR_MAIN]);
             _window.draw(*_menuTxtBarre[BUT_RETOUR_MAIN]);
-            _window.draw(*_menuBarre[BUT_MUSIC_REPEAT]);
-            _window.draw(*_menuTxtBarre[BUT_MUSIC_REPEAT]);
-            _window.draw(*_listeNom[LISTE_MUSIQUES]);
-            _window.draw(*_listeNomTxt[LISTE_MUSIQUES]);
-            _window.draw(*_listeFlecheBas[LISTE_MUSIQUES]);
-            _window.draw(*_listeFlecheHaut[LISTE_MUSIQUES]);
-            _window.draw(*_listeChoix0[LISTE_MUSIQUES]);
-            _window.draw(*_listeChoix1[LISTE_MUSIQUES]);
-            _window.draw(*_listeChoix2[LISTE_MUSIQUES]);
-            if (*_listeCurseur[LISTE_MUSIQUES] + 0 < _listeChoixStr[LISTE_MUSIQUES].size())
-            {
-              _listeChoixTxt0[LISTE_MUSIQUES]->setString(_listeChoixStr[LISTE_MUSIQUES].at(*_listeCurseur[LISTE_MUSIQUES] + 0));
-            }
-            else
-              _listeChoixTxt0[LISTE_MUSIQUES]->setString("");
-            if (*_listeCurseur[LISTE_MUSIQUES] + 1 < _listeChoixStr[LISTE_MUSIQUES].size())
-            {
-              _listeChoixTxt1[LISTE_MUSIQUES]->setString(_listeChoixStr[LISTE_MUSIQUES].at(*_listeCurseur[LISTE_MUSIQUES] + 1));
-            }
-            else
-              _listeChoixTxt1[LISTE_MUSIQUES]->setString("");
-            if (*_listeCurseur[LISTE_MUSIQUES] + 2 < _listeChoixStr[LISTE_MUSIQUES].size())
-            {
-              _listeChoixTxt2[LISTE_MUSIQUES]->setString(_listeChoixStr[LISTE_MUSIQUES].at(*_listeCurseur[LISTE_MUSIQUES] + 2));
-            }
-            else
-              _listeChoixTxt2[LISTE_MUSIQUES]->setString("");
-            _window.draw(*_listeChoixTxt0[LISTE_MUSIQUES]);
-            _window.draw(*_listeChoixTxt1[LISTE_MUSIQUES]);
-            _window.draw(*_listeChoixTxt2[LISTE_MUSIQUES]);
+            
+            _window.draw(*_menuJaugeFond[JAUGE_SON]);
+            _window.draw(*_menuJaugeCursor[JAUGE_SON]);
+            _menuTxtJauge[JAUGE_SON]->setString("Volume du son : "+N::intToString(static_cast<int>(_firehorn_volume))+" %");
+            _menuTxtJauge[JAUGE_SON]->setPosition(
+              _menuJaugeFond[JAUGE_SON]->getPosition().x + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().width - _menuTxtJauge[JAUGE_SON]->getLocalBounds().width ) / 2,
+              _menuJaugeFond[JAUGE_SON]->getPosition().y + (_menuJaugeFond[JAUGE_SON]->getLocalBounds().height- _menuTxtJauge[JAUGE_SON]->getLocalBounds().height) / 4);
+            _window.draw(*_menuTxtJauge[JAUGE_SON]);
+
+            _window.draw(*_menuJaugeFond[JAUGE_MUSIQUE]);
+            _window.draw(*_menuJaugeCursor[JAUGE_MUSIQUE]);
+            _menuTxtJauge[JAUGE_MUSIQUE]->setString("Volume de la musique : "+N::intToString(static_cast<int>(_music_volume))+" %");
+            _menuTxtJauge[JAUGE_MUSIQUE]->setPosition(
+              _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().x + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().width - _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().width ) / 2,
+              _menuJaugeFond[JAUGE_MUSIQUE]->getPosition().y + (_menuJaugeFond[JAUGE_MUSIQUE]->getLocalBounds().height- _menuTxtJauge[JAUGE_MUSIQUE]->getLocalBounds().height) / 4);
+            _window.draw(*_menuTxtJauge[JAUGE_MUSIQUE]);
+
             break;
           default:
             _window.draw(*_menuBarre[BUT_RETOUR_MAIN]);
             _window.draw(*_menuTxtBarre[BUT_RETOUR_MAIN]);
             break;
         }
-        _cursor.setPosition((Vector2f)Mouse::getPosition(_window));
-        _window.draw(_cursor);
+        N::Cursor::GetInstance()->drawOnWindow(&_window);
         _window.display();
         /// FPS Managing
-        sleep (milliseconds(_t_fps -
-                            _chrono.getElapsedTime().asMilliseconds()));
-        _t_passedInOption +=
-          _chrono.getElapsedTime().asMilliseconds();
+        sleep (milliseconds(_t_fps - _chrono.getElapsedTime().asMilliseconds()));
+        _t_passedInOption += _chrono.getElapsedTime().asMilliseconds();
       }
     }
     /// END SCOREBOARD LOOP
@@ -3579,13 +2199,11 @@ int main()
             _window.draw(*_backgroundRocks[i]);
           }
         }
-        _window.draw(Text("Récupération des données en cours ...",
-                          _policeFont, 40));
+        _window.draw(Text("Récupération des données en cours ...", _policeFont, 40));
         _window.display();
         // Se connecter, récupérer le fichier
         _client.connect(_gtaddress, 21).getMessage();
-        _client.login("297899_narwhal1411l",
-                      "rt29xk").getMessage();
+        _client.login("297899_narwhal1411l", "rt29xk").getMessage();
         _client.download("score", "", Ftp::Ascii).getMessage();
         // Récupérer les données
         _sb_amont.open("score");
@@ -3617,7 +2235,7 @@ int main()
           _sb_aval << _sb_players[i] << endl;
         }
         _sb_aval.close();
-        // Envoyer le nouveau scoreboard au serveur et se barrer ma gueule
+        // Envoyer le nouveau scoreboard au serveur et quitter
         _client.upload("score", "", Ftp::Ascii).getMessage();
         _client.disconnect().getMessage();
         // Afficher le scoreboard
@@ -3626,15 +2244,15 @@ int main()
           sprintf_s(_sb_scores_chr[i], " : %d\n", _sb_scores[i]);
           _sb_scores_str[i] = _sb_scores_chr[i];
         }
-        _sb.setString(string("------------------- SCOREBOARD--------------------\n")+ string("*")+_sb_players[0]+_sb_scores_str[0]+
+        _sb.setString(string("------------------- SCOREBOARD--------------------\n")+
+                      string("*")+_sb_players[0]+_sb_scores_str[0]+
                       string("*")+_sb_players[1]+_sb_scores_str[1]+
                       string("*")+_sb_players[2]+_sb_scores_str[2]+
                       string("*")+_sb_players[3]+_sb_scores_str[3]+
                       string("*")+_sb_players[4]+_sb_scores_str[4]+
-                      string(" \n ")+string("Appuyez sur [Entrer] pour rejouer ou [Echap] pour quitter"));
-        _sb.setPosition((WIN_WIDTH - _sb.getLocalBounds().width)
-                        /2.00f, (WIN_HEIGHT-
-                                 _sb.getLocalBounds().height)/2.00f);
+                      string(" \n ")+
+                      string("Appuyez sur [Entrer] pour rejouer ou [Echap] pour quitter"));
+        _sb.setPosition((WIN_WIDTH - _sb.getLocalBounds().width) / 2.f, (WIN_HEIGHT- _sb.getLocalBounds().height) / 2.f);
         _window.clear(Color(255,255,255));
         _window.draw(_background);
         _window.draw(_mysteryBoat);
@@ -3670,39 +2288,19 @@ int main()
         /// ALWAYS REFRESH START TIME BEFORE ENTERING ANY MENU
         _chrono.restart();
         /// Event Managing AfterGame
-        // Event Binding
-        if (_window.pollEvent(_event))
+        N::EventManager::GetInstance()->bind(&_window);
+        if (N::EventManager::GetInstance()->isCloseTriggered())
         {
-          if (_event.type == Event::Closed)
-          {
-            _window.close();
-            _playerIsInMenu = false;
-          } // Red Cross
-          for (int i = 0 ; i < Keyboard::KeyCount ; ++i) //Keyboard
-          {
-            if (_event.type == Event::KeyPressed &&
-                _event.key.code == i)
-            {
-              _key[i] = true;
-            }
-            if (_event.type == Event::KeyReleased &&
-                _event.key.code == i)
-            {
-              _key[i] = false;
-              _keypressed[i] = false;
-            }
-          }
+          _window.close();
+          _playerIsInMenu = false;
         }
         // Key Checking
-        if (_key[Keyboard::Escape] &&
-            !_keypressed[Keyboard::Escape]) /// [Escape] -> Quit the game
+        if (N::EventManager::GetInstance()->isKeyPressed(Keyboard::Escape, true)) /// [Escape] -> Quit the game
         {
           _playerIsInMenu = false;
           _window.close();
-          _keypressed[Keyboard::Escape] = true;
         }
-        if (_key[Keyboard::Return] &&
-            !_keypressed[Keyboard::Return]) /// [Enter] -> Restart game
+        if (N::EventManager::GetInstance()->isKeyPressed(Keyboard::Return, true)) /// [Enter] -> Restart game
         {
           _playerIsInMenu = false;
           _playerIsInGame = true;
@@ -3720,21 +2318,6 @@ int main()
           _t_passedInGame = 0;
           _t_passedInMenu = 0;
           _t_passedInOption = 0;
-          _keypressed[Keyboard::Return] = true;
-        }
-        // Music
-        if (_music_repeatfolder)
-        {
-          if (_music.getDuration().asSeconds() <=
-              _music.getPlayingOffset().asSeconds() + 0.5f)
-          {
-            *_listeSelected[LISTE_MUSIQUES] =
-              (_music_randomfolder) ? rand() % _music_list.size() :
-              (*_listeSelected[LISTE_MUSIQUES] + 1) % _music_list.size();
-            _music.stop();
-            _music.openFromFile("assets/audio/musiques/"+_music_list.at(*_listeSelected[LISTE_MUSIQUES]));
-            _music.play();
-          }
         }
         // Drawing
         _window.clear(Color(255,255,255));
@@ -3747,16 +2330,12 @@ int main()
             _window.draw(*_backgroundRocks[i]);
           }
         }
-        if (_connected)
-          _window.draw(_sb);
+        if (_connected) _window.draw(_sb);
         else _window.draw(Text("Appuyez sur [Entrer] pour rejouer ou [Echap] pour quitter", _policeFont, 40));
-        _cursor.setPosition((Vector2f)Mouse::getPosition(_window));
-        _window.draw(_cursor);
+        N::Cursor::GetInstance()->drawOnWindow(&_window);
         _window.display();
-        sleep(milliseconds(_t_fps -
-                           _chrono.getElapsedTime().asMilliseconds()));
-        _t_passedInMenu +=
-          _chrono.getElapsedTime().asMilliseconds();
+        sleep(milliseconds(_t_fps - _chrono.getElapsedTime().asMilliseconds()));
+        _t_passedInMenu += _chrono.getElapsedTime().asMilliseconds();
       }
     }
   }
@@ -3800,35 +2379,6 @@ int main()
     _menuJaugeRect[i] = 0;
     delete _menuJaugeFond[i];
     _menuJaugeFond[i] = 0;
-  }
-  for (unsigned int i = 0 ; i < NBR_LISTES ; ++i)
-  {
-    delete _listeChoixTxt0[i];
-    _listeChoixTxt0[i] = 0;
-    delete _listeChoixTxt1[i];
-    _listeChoixTxt1[i] = 0;
-    delete _listeChoixTxt2[i];
-    _listeChoixTxt2[i] = 0;
-    delete _listeChoix0[i];
-    _listeChoix0[i] = 0;
-    delete _listeChoix1[i];
-    _listeChoix1[i] = 0;
-    delete _listeChoix2[i];
-    _listeChoix2[i] = 0;
-    delete _listeCurseur[i];
-    _listeCurseur[i] = 0;
-    delete _listeFlecheBas[i];
-    _listeFlecheBas[i] = 0;
-    delete _listeFlecheHaut[i];
-    _listeFlecheHaut[i] = 0;
-    delete _listeNom[i];
-    _listeNom[i] = 0;
-    delete _listeNomTxt[i];
-    _listeNomTxt[i] = 0;
-    delete _listeRect[i];
-    _listeRect[i] = 0;
-    delete _listeSelected[i];
-    _listeSelected[i] = 0;
   }
   // FIREBALLS
   for (unsigned int i = 0 ; i < MAX_FIREBALL ; ++i)
@@ -3906,9 +2456,5 @@ int main()
       _backgroundRocks[i] = 0;
     }
   }
-  free(_key);
-  free(_keypressed);
-  free(_button);
-  free(_buttonpressed);
   return 0;
 }

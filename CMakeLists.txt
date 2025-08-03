@@ -18,4 +18,4 @@ add_executable(${PROJECT_NAME} ${SOURCE_DIRECTORY})
 
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 target_link_libraries(${PROJECT_NAME} PRIVATE sfml-network sfml-graphics sfml-audio sfml-window sfml-system)
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)

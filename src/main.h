@@ -156,7 +156,4 @@ la position actuelle :ios::cur.
 #define KEYB_FPSDISP 6
 #define NBR_KEYS 7
 
-#define LISTE_MUSIQUES 0
-#define NBR_LISTES 1
-
 #endif // MAIN_H
